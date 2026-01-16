@@ -256,7 +256,12 @@ export default function LoanDetail() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
-                                        <input type="number" value={editForm.principal_amount} onChange={e => setEditForm({ ...editForm, principal_amount: parseFloat(e.target.value) })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                        <input
+                                            type="number"
+                                            value={editForm.principal_amount || ''}
+                                            onChange={e => setEditForm({ ...editForm, principal_amount: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+                                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
@@ -266,7 +271,12 @@ export default function LoanDetail() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
-                                        <input type="number" value={editForm.interest_rate} onChange={e => setEditForm({ ...editForm, interest_rate: parseFloat(e.target.value) })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                        <input
+                                            type="number"
+                                            value={editForm.interest_rate || ''}
+                                            onChange={e => setEditForm({ ...editForm, interest_rate: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+                                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                        />
                                     </div>
                                     <div>
                                         <label className="text-xs text-zinc-400 block mb-1">Interval</label>
