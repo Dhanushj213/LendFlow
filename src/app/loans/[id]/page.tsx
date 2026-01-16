@@ -215,294 +215,308 @@ export default function LoanDetail() {
 
     const handleForecast = () => {
         if (!forecastDate) {
-            alert('Please select a future date.');
+            alert('Please select a date.');
             return;
         }
         const target = new Date(forecastDate);
-        const startPoint = new Date(); // Forecast from now
-        setForecastResult(null);
+        const now = new Date();
+        const start = new Date(loan.start_date);
 
-        // Diff in days
-        const diffTime = target.getTime() - startPoint.getTime();
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        let interest = 0;
+        let diffDays = 0;
 
-        if (diffDays <= 0) {
-            setForecastResult({ days: 0, interest: 0, total: totalDue });
-            return;
-        }
+        // Helper Calculation
+        const calculateInterest = (principal: number, days: number) => {
+            let dailyRate = 0;
+            // Use DB stored rate (decimal)
+            let rateDecimal = loan.interest_rate;
 
-        let dailyRate = 0;
-        if (loan.rate_interval === 'ANNUALLY') dailyRate = loan.interest_rate / 365.0;
-        else if (loan.rate_interval === 'MONTHLY') dailyRate = loan.interest_rate / 30.0;
-        else dailyRate = loan.interest_rate;
+            if (loan.rate_interval === 'ANNUALLY') dailyRate = rateDecimal / 365.0;
+            else if (loan.rate_interval === 'MONTHLY') dailyRate = rateDecimal / 30.0;
+            else dailyRate = rateDecimal;
 
-        let projectedInterest = 0;
-        let base = loan.current_principal;
+            if (loan.interest_type === 'SIMPLE') {
+                return principal * dailyRate * days;
+            } else {
+                const amount = principal * Math.pow((1 + dailyRate), days);
+                return amount - principal;
+            }
+        };
 
-        if (loan.interest_type === 'SIMPLE') {
-            projectedInterest = base * dailyRate * diffDays;
+        if (target < now) {
+            // Past Calculation: Interest from Start to Target
+            const diffTime = target.getTime() - start.getTime();
+            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays <= 0) {
+                setForecastResult({ days: 0, interest: 0, total: loan.current_principal });
+                return;
+            }
+
+            interest = calculateInterest(loan.current_principal, diffDays);
         } else {
-            // Compound (Daily compounding approximation for forecast)
-            // base * (1+r)^t - base
-            // Actually our stored proc loops. Let's use simple compound formula.
-            // A = P(1+r)^t
-            const amount = base * Math.pow((1 + dailyRate), diffDays);
-            projectedInterest = amount - base;
+            // Future Calculation: Current Accrued + Interest from Now to Target
+            const diffTime = target.getTime() - now.getTime();
+            diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            const futureInterest = calculateInterest(loan.current_principal, diffDays);
+            interest = loan.accrued_interest + futureInterest;
+            // Note: interest here represents "Total Interest Accrued by Target Date"
         }
 
-        // Add existing accrued interest to get TRUE total
-        const finalTotal = loan.current_principal + loan.accrued_interest + projectedInterest;
+        const total = loan.current_principal + interest;
 
         setForecastResult({
             days: diffDays,
-            interest: projectedInterest,
-            total: finalTotal
+            interest: interest,
+            total: total
         });
     };
+};
 
-    return (
-        <main className="min-h-screen bg-black p-4 md:p-8">
-            <div className="max-w-4xl mx-auto">
-                <Link href="/" className="text-zinc-500 hover:text-white flex items-center gap-2 mb-8 transition-colors">
-                    <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-                </Link>
+return (
+    <main className="min-h-screen bg-black p-4 md:p-8">
+        <div className="max-w-4xl mx-auto">
+            <Link href="/" className="text-zinc-500 hover:text-white flex items-center gap-2 mb-8 transition-colors">
+                <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+            </Link>
 
-                {/* Modals */}
-                {isEditing && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
-                            <button onClick={() => setIsEditing(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
-                                <X className="w-5 h-5" />
-                            </button>
-                            <h2 className="text-xl font-bold text-white mb-6">Edit Loan Details</h2>
-                            <form onSubmit={handleEditSubmit} className="space-y-4">
+            {/* Modals */}
+            {isEditing && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
+                        <button onClick={() => setIsEditing(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <h2 className="text-xl font-bold text-white mb-6">Edit Loan Details</h2>
+                        <form onSubmit={handleEditSubmit} className="space-y-4">
+                            <div>
+                                <label className="text-xs text-zinc-400 block mb-1">Borrower Name</label>
+                                <input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs text-zinc-400 block mb-1">Borrower Name</label>
-                                    <input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
-                                        <input
-                                            type="number"
-                                            value={editForm.principal_amount || ''}
-                                            onChange={e => setEditForm({ ...editForm, principal_amount: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
-                                        <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
-                                        <input
-                                            type="number"
-                                            value={editForm.interest_rate || ''}
-                                            onChange={e => setEditForm({ ...editForm, interest_rate: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
-                                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-zinc-400 block mb-1">Interval</label>
-                                        <select value={editForm.rate_interval} onChange={e => setEditForm({ ...editForm, rate_interval: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none">
-                                            <option value="MONTHLY">Monthly</option>
-                                            <option value="ANNUALLY">Annually</option>
-                                            <option value="DAILY">Daily</option>
-                                        </select>
-                                    </div>
-                                </div>
-                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl mt-4">Save Changes</button>
-                            </form>
-                        </div>
-                    </div>
-                )}
-
-                {isForecasting && (
-                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-                        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
-                            <button onClick={() => { setIsForecasting(false); setForecastResult(null); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
-                                <X className="w-5 h-5" />
-                            </button>
-                            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-                                <Calculator className="w-5 h-5 text-emerald-500" /> Interest Forecaster
-                            </h2>
-                            <p className="text-sm text-zinc-400 mb-6">Calculate accrued interest for a future date.</p>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="text-xs text-zinc-400 block mb-1">Select Target Date</label>
+                                    <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
                                     <input
-                                        type="date"
-                                        min={new Date().toISOString().split('T')[0]}
-                                        value={forecastDate}
-                                        onChange={e => setForecastDate(e.target.value)}
+                                        type="number"
+                                        value={editForm.principal_amount || ''}
+                                        onChange={e => setEditForm({ ...editForm, principal_amount: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
                                         className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
                                     />
                                 </div>
-                                <button onClick={handleForecast} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 rounded-xl border border-zinc-700">
-                                    Calculate
-                                </button>
-
-                                {forecastResult && (
-                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mt-4 space-y-2">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-zinc-400">Calculation Days</span>
-                                            <span className="text-white font-mono">{forecastResult.days} days</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-zinc-400">Total Interest</span>
-                                            <span className="text-emerald-400 font-mono font-bold">
-                                                {formatCurrency(forecastResult.interest)}
-                                            </span>
-                                        </div>
-                                        <div className="border-t border-emerald-500/20 pt-2 flex justify-between items-center">
-                                            <span className="text-emerald-500 font-medium">Total Due</span>
-                                            <span className="text-xl font-bold text-white font-mono">
-                                                {formatCurrency(forecastResult.total)}
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
+                                    <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Header Actions */}
-                <div className="flex justify-between items-start mb-8">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-3xl font-bold text-white">{loan.borrower?.name}</h1>
-                            <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
-                                <Pencil className="w-4 h-4" />
-                            </button>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-zinc-400">
-                            <span className="bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full">
-                                {loan.rate_interval} Rate: {(loan.interest_rate * (loan.rate_interval === 'ANNUALLY' || loan.rate_interval === 'DAILY' ? 100 : 1)).toFixed(2)}%
-                            </span>
-                            <span className={`px-3 py-1 rounded-full border ${loan.status === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
-                                {loan.status}
-                            </span>
-                            <button onClick={() => setIsForecasting(true)} className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
-                                <Calendar className="w-3 h-3" /> Forecast Interest
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    {/* Stats */}
-                    <div className="md:col-span-2 grid grid-cols-2 gap-4">
-                        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
-                            <span className="text-zinc-500 text-sm">Principal Balance</span>
-                            <div className="text-2xl font-bold text-white mt-1">{formatCurrency(loan.current_principal)}</div>
-                        </div>
-                        <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
-                            <span className="text-zinc-500 text-sm">Accrued Interest</span>
-                            <div className="text-2xl font-bold text-blue-400 mt-1">{formatCurrency(loan.accrued_interest)}</div>
-                        </div>
-                        <div className="col-span-2 bg-gradient-to-r from-zinc-900 to-zinc-900/50 border border-zinc-800 p-6 rounded-xl flex justify-between items-center">
-                            <div>
-                                <span className="text-zinc-500 text-sm">Total Payoff Amount</span>
-                                <div className="text-3xl font-bold text-white mt-1">{formatCurrency(totalDue)}</div>
-                            </div>
-                            <div className="text-right">
-                                <span className="text-zinc-500 text-sm block">Original Loan</span>
-                                <span className="text-zinc-300 font-mono">{formatCurrency(loan.principal_amount)}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Payment Form */}
-                    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                        <h3 className="font-semibold text-white mb-4">Record Payment</h3>
-                        {loan.status === 'ACTIVE' ? (
-                            <form onSubmit={handlePayment} className="space-y-4">
-                                <div className="relative">
-                                    <span className="absolute left-4 top-3 text-zinc-500">₹</span>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
                                     <input
                                         type="number"
-                                        step="0.01"
-                                        required
-                                        className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 pl-8 px-4 text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none"
-                                        placeholder="0.00"
-                                        value={paymentAmount}
-                                        onChange={(e) => setPaymentAmount(e.target.value)}
+                                        value={editForm.interest_rate || ''}
+                                        onChange={e => setEditForm({ ...editForm, interest_rate: e.target.value === '' ? 0 : parseFloat(e.target.value) })}
+                                        className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
                                     />
                                 </div>
-                                <button
-                                    type="submit"
-                                    disabled={isPaying}
-                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
-                                >
-                                    {isPaying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Payment'}
-                                </button>
-                                <p className="text-xs text-zinc-500 text-center">
-                                    Payments apply to Interest first, then Principal.
-                                </p>
-                            </form>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-zinc-500 border-2 border-dashed border-zinc-800 rounded-lg">
-                                <span className="font-medium">Loan Closed</span>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Interval</label>
+                                    <select value={editForm.rate_interval} onChange={e => setEditForm({ ...editForm, rate_interval: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none">
+                                        <option value="MONTHLY">Monthly</option>
+                                        <option value="ANNUALLY">Annually</option>
+                                        <option value="DAILY">Daily</option>
+                                    </select>
+                                </div>
                             </div>
-                        )}
+                            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl mt-4">Save Changes</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isForecasting && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                    <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
+                        <button onClick={() => { setIsForecasting(false); setForecastResult(null); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
+                            <X className="w-5 h-5" />
+                        </button>
+                        <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                            <Calculator className="w-5 h-5 text-emerald-500" /> Interest Forecaster
+                        </h2>
+                        <p className="text-sm text-zinc-400 mb-6">Calculate accrued interest for a future date.</p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs text-zinc-400 block mb-1">Select Target Date</label>
+                                <input
+                                    type="date"
+                                    min={new Date().toISOString().split('T')[0]}
+                                    value={forecastDate}
+                                    onChange={e => setForecastDate(e.target.value)}
+                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                />
+                            </div>
+                            <button onClick={handleForecast} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 rounded-xl border border-zinc-700">
+                                Calculate
+                            </button>
+
+                            {forecastResult && (
+                                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mt-4 space-y-2">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-zinc-400">Calculation Days</span>
+                                        <span className="text-white font-mono">{forecastResult.days} days</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-zinc-400">Total Interest</span>
+                                        <span className="text-emerald-400 font-mono font-bold">
+                                            {formatCurrency(forecastResult.interest)}
+                                        </span>
+                                    </div>
+                                    <div className="border-t border-emerald-500/20 pt-2 flex justify-between items-center">
+                                        <span className="text-emerald-500 font-medium">Total Due</span>
+                                        <span className="text-xl font-bold text-white font-mono">
+                                            {formatCurrency(forecastResult.total)}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Header Actions */}
+            <div className="flex justify-between items-start mb-8">
+                <div>
+                    <div className="flex items-center gap-3 mb-2">
+                        <h1 className="text-3xl font-bold text-white">{loan.borrower?.name}</h1>
+                        <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
+                            <Pencil className="w-4 h-4" />
+                        </button>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-zinc-400">
+                        <span className="bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full">
+                            {loan.rate_interval} Rate: {(loan.interest_rate * (loan.rate_interval === 'ANNUALLY' || loan.rate_interval === 'DAILY' ? 100 : 1)).toFixed(2)}%
+                        </span>
+                        <span className={`px-3 py-1 rounded-full border ${loan.status === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
+                            {loan.status}
+                        </span>
+                        <button onClick={() => setIsForecasting(true)} className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
+                            <Calendar className="w-3 h-3" /> Forecast Interest
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {/* Stats */}
+                <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                    <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
+                        <span className="text-zinc-500 text-sm">Principal Balance</span>
+                        <div className="text-2xl font-bold text-white mt-1">{formatCurrency(loan.current_principal)}</div>
+                    </div>
+                    <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
+                        <span className="text-zinc-500 text-sm">Accrued Interest</span>
+                        <div className="text-2xl font-bold text-blue-400 mt-1">{formatCurrency(loan.accrued_interest)}</div>
+                    </div>
+                    <div className="col-span-2 bg-gradient-to-r from-zinc-900 to-zinc-900/50 border border-zinc-800 p-6 rounded-xl flex justify-between items-center">
+                        <div>
+                            <span className="text-zinc-500 text-sm">Total Payoff Amount</span>
+                            <div className="text-3xl font-bold text-white mt-1">{formatCurrency(totalDue)}</div>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-zinc-500 text-sm block">Original Loan</span>
+                            <span className="text-zinc-300 font-mono">{formatCurrency(loan.principal_amount)}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Transactions */}
-                <section>
-                    <h3 className="text-xl font-bold text-white mb-4">Transaction History</h3>
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                        <table className="w-full text-left">
-                            <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-sm">
-                                <tr>
-                                    <th className="p-4 font-medium">Date</th>
-                                    <th className="p-4 font-medium">Type</th>
-                                    <th className="p-4 font-medium">Amount</th>
-                                    <th className="p-4 font-medium">Breakdown</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-zinc-800">
-                                {transactions.map(tx => (
-                                    <tr key={tx.id} className="group hover:bg-zinc-800/50 transition-colors">
-                                        <td className="p-4 text-zinc-400 text-sm">
-                                            {new Date(tx.created_at).toLocaleDateString()}
-                                            <span className="text-xs text-zinc-600 block">{new Date(tx.created_at).toLocaleTimeString()}</span>
-                                        </td>
-                                        <td className="p-4">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${tx.type === 'PAYMENT'
-                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
-                                                }`}>
-                                                {tx.type === 'PAYMENT' ? <ArrowDownLeft className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
-                                                {tx.type}
-                                            </span>
-                                        </td>
-                                        <td className={`p-4 font-mono font-medium ${tx.type === 'PAYMENT' ? 'text-emerald-400' : 'text-zinc-300'}`}>
-                                            {tx.type === 'PAYMENT' ? '-' : '+'}{formatCurrency(tx.amount)}
-                                        </td>
-                                        <td className="p-4 text-sm text-zinc-500">
-                                            {tx.type === 'PAYMENT' && tx.breakdown && (
-                                                <span className="flex gap-3">
-                                                    <span>Prin: {formatCurrency(tx.breakdown.principal)}</span>
-                                                    <span>Int: {formatCurrency(tx.breakdown.interest)}</span>
-                                                </span>
-                                            )}
-                                            {tx.type === 'ACCRUAL' && (
-                                                <span>Daily Interest Accrual</span>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                {/* Payment Form */}
+                <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
+                    <h3 className="font-semibold text-white mb-4">Record Payment</h3>
+                    {loan.status === 'ACTIVE' ? (
+                        <form onSubmit={handlePayment} className="space-y-4">
+                            <div className="relative">
+                                <span className="absolute left-4 top-3 text-zinc-500">₹</span>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    required
+                                    className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 pl-8 px-4 text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none"
+                                    placeholder="0.00"
+                                    value={paymentAmount}
+                                    onChange={(e) => setPaymentAmount(e.target.value)}
+                                />
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={isPaying}
+                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-lg transition-all shadow-lg shadow-emerald-900/20 disabled:opacity-50 flex justify-center items-center gap-2"
+                            >
+                                {isPaying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Submit Payment'}
+                            </button>
+                            <p className="text-xs text-zinc-500 text-center">
+                                Payments apply to Interest first, then Principal.
+                            </p>
+                        </form>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-zinc-500 border-2 border-dashed border-zinc-800 rounded-lg">
+                            <span className="font-medium">Loan Closed</span>
+                        </div>
+                    )}
+                </div>
             </div>
-        </main>
-    );
+
+            {/* Transactions */}
+            <section>
+                <h3 className="text-xl font-bold text-white mb-4">Transaction History</h3>
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                    <table className="w-full text-left">
+                        <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-sm">
+                            <tr>
+                                <th className="p-4 font-medium">Date</th>
+                                <th className="p-4 font-medium">Type</th>
+                                <th className="p-4 font-medium">Amount</th>
+                                <th className="p-4 font-medium">Breakdown</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800">
+                            {transactions.map(tx => (
+                                <tr key={tx.id} className="group hover:bg-zinc-800/50 transition-colors">
+                                    <td className="p-4 text-zinc-400 text-sm">
+                                        {new Date(tx.created_at).toLocaleDateString()}
+                                        <span className="text-xs text-zinc-600 block">{new Date(tx.created_at).toLocaleTimeString()}</span>
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${tx.type === 'PAYMENT'
+                                            ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                            : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                                            }`}>
+                                            {tx.type === 'PAYMENT' ? <ArrowDownLeft className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+                                            {tx.type}
+                                        </span>
+                                    </td>
+                                    <td className={`p-4 font-mono font-medium ${tx.type === 'PAYMENT' ? 'text-emerald-400' : 'text-zinc-300'}`}>
+                                        {tx.type === 'PAYMENT' ? '-' : '+'}{formatCurrency(tx.amount)}
+                                    </td>
+                                    <td className="p-4 text-sm text-zinc-500">
+                                        {tx.type === 'PAYMENT' && tx.breakdown && (
+                                            <span className="flex gap-3">
+                                                <span>Prin: {formatCurrency(tx.breakdown.principal)}</span>
+                                                <span>Int: {formatCurrency(tx.breakdown.interest)}</span>
+                                            </span>
+                                        )}
+                                        {tx.type === 'ACCRUAL' && (
+                                            <span>Daily Interest Accrual</span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+    </main>
+);
 }
