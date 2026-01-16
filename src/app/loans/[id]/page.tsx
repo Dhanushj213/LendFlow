@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase';
-import { ArrowLeft, Loader2, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
+import { ArrowLeft, Loader2, ArrowUpRight, ArrowDownLeft, Clock, Pencil, Calculator, Calendar, X } from 'lucide-react';
 import Link from 'next/link';
 
 interface Transaction {
@@ -16,12 +16,14 @@ interface Transaction {
 
 interface Loan {
     id: string;
-    borrower: { name: string };
+    borrower: { id: string, name: string };
     principal_amount: number;
     current_principal: number;
     accrued_interest: number;
     interest_rate: number;
     rate_interval: string;
+    interest_type: string; // Added
+    start_date: string; // Added
     status: string;
     last_accrual_date: string;
 }
@@ -38,6 +40,22 @@ export default function LoanDetail() {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [isPaying, setIsPaying] = useState(false);
 
+    // Edit Loan State
+    const [isEditing, setIsEditing] = useState(false);
+    const [editForm, setEditForm] = useState({
+        name: '',
+        principal_amount: 0,
+        interest_rate: 0,
+        rate_interval: 'MONTHLY',
+        start_date: '',
+        interest_type: 'SIMPLE'
+    });
+
+    // Forecast State
+    const [isForecasting, setIsForecasting] = useState(false);
+    const [forecastDate, setForecastDate] = useState('');
+    const [forecastResult, setForecastResult] = useState<null | { days: number, interest: number, total: number }>(null);
+
     useEffect(() => {
         if (id) fetchLoanData();
     }, [id]);
@@ -50,12 +68,22 @@ export default function LoanDetail() {
             // 2. Fetch Loan
             const { data: loanData, error: loanError } = await supabase
                 .from('loans')
-                .select(`*, borrower:borrowers(name)`)
+                .select(`*, borrower:borrowers(id, name)`)
                 .eq('id', id)
                 .single();
 
             if (loanError) throw loanError;
             setLoan(loanData as any);
+
+            // Initialize Edit Form
+            setEditForm({
+                name: loanData.borrower.name,
+                principal_amount: loanData.principal_amount,
+                interest_rate: (loanData.interest_rate * (loanData.rate_interval === 'ANNUALLY' || loanData.rate_interval === 'DAILY' ? 100 : 1)), // Convert back to %
+                rate_interval: loanData.rate_interval,
+                start_date: loanData.start_date,
+                interest_type: loanData.interest_type
+            });
 
             // 3. Fetch Transactions
             const { data: txData, error: txError } = await supabase
@@ -108,6 +136,93 @@ export default function LoanDetail() {
 
     const totalDue = loan.current_principal + loan.accrued_interest;
 
+    const handleEditSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            // 1. Update Borrower Name
+            const { error: borrowerError } = await supabase
+                .from('borrowers')
+                .update({ name: editForm.name })
+                .eq('id', loan.borrower.id);
+            if (borrowerError) throw borrowerError;
+
+            // 2. Update Loan Details
+            // Convert rate back to decimal
+            let rateDecimal = editForm.interest_rate;
+            if (editForm.rate_interval === 'ANNUALLY') rateDecimal = editForm.interest_rate / 100;
+            else if (editForm.rate_interval === 'DAILY') rateDecimal = editForm.interest_rate / 100;
+            else rateDecimal = editForm.interest_rate / 100; // Monthly 2% -> 0.02 stored
+
+            const { error: loanUpdateError } = await supabase
+                .from('loans')
+                .update({
+                    principal_amount: editForm.principal_amount,
+                    // If principal changed, should we update current_principal? 
+                    // For simplicity, let's assume editing principal RESETS the loan or adjusts it delta. 
+                    // Actually, modifying past loans is tricky. 
+                    // Let's just update the reference 'principal_amount' and 'interest_rate'. 
+                    // Start date change might require re-calc of EVERYTHING.
+                    // For now, simple metadata updates. Re-calculating history is complex.
+                    interest_rate: rateDecimal,
+                    rate_interval: editForm.rate_interval,
+                    start_date: editForm.start_date,
+                    interest_type: editForm.interest_type
+                })
+                .eq('id', id);
+
+            if (loanUpdateError) throw loanUpdateError;
+
+            setIsEditing(false);
+            fetchLoanData();
+            alert('Loan details updated!');
+        } catch (e: any) {
+            alert('Update Error: ' + e.message);
+        }
+    };
+
+    const handleForecast = () => {
+        if (!forecastDate) return;
+        const target = new Date(forecastDate);
+        const lastAccrual = new Date(loan.last_accrual_date);
+
+        // Diff in days
+        const diffTime = target.getTime() - lastAccrual.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 0) {
+            setForecastResult({ days: 0, interest: 0, total: totalDue });
+            return;
+        }
+
+        let dailyRate = 0;
+        if (loan.rate_interval === 'ANNUALLY') dailyRate = loan.interest_rate / 365.0;
+        else if (loan.rate_interval === 'MONTHLY') dailyRate = loan.interest_rate / 30.0;
+        else dailyRate = loan.interest_rate;
+
+        let projectedInterest = 0;
+        let base = loan.current_principal;
+
+        if (loan.interest_type === 'SIMPLE') {
+            projectedInterest = base * dailyRate * diffDays;
+        } else {
+            // Compound (Daily compounding approximation for forecast)
+            // base * (1+r)^t - base
+            // Actually our stored proc loops. Let's use simple compound formula.
+            // A = P(1+r)^t
+            const amount = base * Math.pow((1 + dailyRate), diffDays);
+            projectedInterest = amount - base;
+        }
+
+        // Add existing accrued
+        projectedInterest += loan.accrued_interest;
+
+        setForecastResult({
+            days: diffDays,
+            interest: projectedInterest,
+            total: loan.current_principal + projectedInterest
+        });
+    };
+
     return (
         <main className="min-h-screen bg-black p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
@@ -115,10 +230,109 @@ export default function LoanDetail() {
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                 </Link>
 
-                {/* Header */}
+                {/* Modals */}
+                {isEditing && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-lg shadow-2xl relative">
+                            <button onClick={() => setIsEditing(false)} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <h2 className="text-xl font-bold text-white mb-6">Edit Loan Details</h2>
+                            <form onSubmit={handleEditSubmit} className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Borrower Name</label>
+                                    <input type="text" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
+                                        <input type="number" value={editForm.principal_amount} onChange={e => setEditForm({ ...editForm, principal_amount: parseFloat(e.target.value) })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
+                                        <input type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
+                                        <input type="number" value={editForm.interest_rate} onChange={e => setEditForm({ ...editForm, interest_rate: parseFloat(e.target.value) })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Interval</label>
+                                        <select value={editForm.rate_interval} onChange={e => setEditForm({ ...editForm, rate_interval: e.target.value })} className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none">
+                                            <option value="MONTHLY">Monthly</option>
+                                            <option value="ANNUALLY">Annually</option>
+                                            <option value="DAILY">Daily</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-3 rounded-xl mt-4">Save Changes</button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
+                {isForecasting && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                        <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl w-full max-w-md shadow-2xl relative">
+                            <button onClick={() => { setIsForecasting(false); setForecastResult(null); }} className="absolute top-4 right-4 text-zinc-500 hover:text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+                                <Calculator className="w-5 h-5 text-emerald-500" /> Interest Forecaster
+                            </h2>
+                            <p className="text-sm text-zinc-400 mb-6">Calculate accrued interest for a future date.</p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Select Target Date</label>
+                                    <input
+                                        type="date"
+                                        min={new Date().toISOString().split('T')[0]}
+                                        value={forecastDate}
+                                        onChange={e => setForecastDate(e.target.value)}
+                                        className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                    />
+                                </div>
+                                <button onClick={handleForecast} className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 rounded-xl border border-zinc-700">
+                                    Calculate
+                                </button>
+
+                                {forecastResult && (
+                                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mt-4 space-y-2">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-zinc-400">Additional Days</span>
+                                            <span className="text-white font-mono">+{forecastResult.days}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-zinc-400">Projected Interest</span>
+                                            <span className="text-emerald-400 font-mono font-bold">
+                                                {formatCurrency(forecastResult.interest)}
+                                            </span>
+                                        </div>
+                                        <div className="border-t border-emerald-500/20 pt-2 flex justify-between items-center">
+                                            <span className="text-emerald-500 font-medium">Total Due</span>
+                                            <span className="text-xl font-bold text-white font-mono">
+                                                {formatCurrency(forecastResult.total)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Header Actions */}
                 <div className="flex justify-between items-start mb-8">
                     <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">{loan.borrower?.name}</h1>
+                        <div className="flex items-center gap-3 mb-2">
+                            <h1 className="text-3xl font-bold text-white">{loan.borrower?.name}</h1>
+                            <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
+                                <Pencil className="w-4 h-4" />
+                            </button>
+                        </div>
                         <div className="flex items-center gap-4 text-sm text-zinc-400">
                             <span className="bg-zinc-900 border border-zinc-800 px-3 py-1 rounded-full">
                                 {loan.rate_interval} Rate: {(loan.interest_rate * (loan.rate_interval === 'ANNUALLY' || loan.rate_interval === 'DAILY' ? 100 : 1)).toFixed(2)}%
@@ -126,6 +340,9 @@ export default function LoanDetail() {
                             <span className={`px-3 py-1 rounded-full border ${loan.status === 'ACTIVE' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 'bg-zinc-800 border-zinc-700 text-zinc-400'}`}>
                                 {loan.status}
                             </span>
+                            <button onClick={() => setIsForecasting(true)} className="flex items-center gap-1.5 hover:text-emerald-400 transition-colors">
+                                <Calendar className="w-3 h-3" /> Forecast Interest
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -211,8 +428,8 @@ export default function LoanDetail() {
                                         </td>
                                         <td className="p-4">
                                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${tx.type === 'PAYMENT'
-                                                    ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
-                                                    : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                                                ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20'
+                                                : 'bg-zinc-800 text-zinc-400 border-zinc-700'
                                                 }`}>
                                                 {tx.type === 'PAYMENT' ? <ArrowDownLeft className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                                                 {tx.type}
