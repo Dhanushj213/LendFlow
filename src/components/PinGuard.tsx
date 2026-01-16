@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { clsx } from 'clsx';
 import { Lock, ChevronRight, ShieldCheck } from 'lucide-react';
 
@@ -54,11 +55,16 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
 
             <div className="w-full max-w-md relative z-10">
                 <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 mb-4 shadow-lg shadow-emerald-500/10">
-                        <Lock className="w-5 h-5 text-emerald-500" />
+                    <div className="relative h-16 w-48 mx-auto mb-2">
+                        <Image
+                            src="/LendFlow.png"
+                            alt="LendFlow"
+                            fill
+                            className="object-contain"
+                            priority
+                        />
                     </div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight">LendFlow</h1>
-                    <p className="text-zinc-500 text-sm mt-1">Secure Interest Engine</p>
+                    <p className="text-zinc-500 text-sm">Secure Interest Engine</p>
                 </div>
 
                 <form onSubmit={handleUnlock} className="glass-panel p-8 rounded-2xl shadow-2xl backdrop-blur-xl border border-zinc-800/50">

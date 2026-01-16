@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar } from 'lucide-react';
 
 interface Transaction {
@@ -129,7 +130,15 @@ export default function Dashboard() {
         {/* Header */}
         <header className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-white">LendFlow</h1>
+            <div className="relative h-10 w-40 mb-1">
+              <Image
+                src="/LendFlow.png"
+                alt="LendFlow"
+                fill
+                className="object-contain object-left"
+                priority
+              />
+            </div>
             <p className="text-zinc-400 text-sm">Portfolio Overview</p>
           </div>
           <div className="flex gap-4">
