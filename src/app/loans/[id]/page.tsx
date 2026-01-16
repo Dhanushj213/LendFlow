@@ -163,6 +163,31 @@ export default function LoanDetail() {
             const principalDelta = editForm.principal_amount - loan.principal_amount;
             const newCurrentPrincipal = loan.current_principal + principalDelta;
 
+            // Recalculate Accrued Interest from Start Date to NOW with NEW TERMS
+            // This fixes history if the user corrects the Rate or Start Date
+            const startDate = new Date(editForm.start_date);
+            const now = new Date();
+            const diffTime = now.getTime() - startDate.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            let newAccruedInterest = 0;
+            if (diffDays > 0) {
+                let dailyRate = 0;
+                if (editForm.rate_interval === 'ANNUALLY') dailyRate = rateDecimal / 365.0;
+                else if (editForm.rate_interval === 'MONTHLY') dailyRate = rateDecimal / 30.0;
+                else dailyRate = rateDecimal;
+
+                // Use current principal as base for robust simple correction
+                const base = newCurrentPrincipal;
+
+                if (editForm.interest_type === 'SIMPLE') {
+                    newAccruedInterest = base * dailyRate * diffDays;
+                } else {
+                    const amount = base * Math.pow((1 + dailyRate), diffDays);
+                    newAccruedInterest = amount - base;
+                }
+            }
+
             const { error: loanUpdateError } = await supabase
                 .from('loans')
                 .update({
@@ -171,7 +196,9 @@ export default function LoanDetail() {
                     interest_rate: rateDecimal,
                     rate_interval: editForm.rate_interval,
                     start_date: editForm.start_date,
-                    interest_type: editForm.interest_type
+                    interest_type: editForm.interest_type,
+                    accrued_interest: newAccruedInterest, // Update with re-calc
+                    last_accrual_date: new Date().toISOString() // Synced up to now
                 })
                 .eq('id', id);
 
