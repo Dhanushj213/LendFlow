@@ -342,14 +342,13 @@ export default function LoanDetail() {
                             <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
                                 <Calculator className="w-5 h-5 text-emerald-500" /> Interest Forecaster
                             </h2>
-                            <p className="text-sm text-zinc-400 mb-6">Calculate accrued interest for a future date.</p>
+                            <p className="text-sm text-zinc-400 mb-6">Calculate accrued interest for your required date.</p>
 
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-xs text-zinc-400 block mb-1">Select Target Date</label>
                                     <input
                                         type="date"
-                                        min={new Date().toISOString().split('T')[0]}
                                         value={forecastDate}
                                         onChange={e => setForecastDate(e.target.value)}
                                         className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
