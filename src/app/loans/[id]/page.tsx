@@ -144,25 +144,30 @@ export default function LoanDetail() {
                 .from('borrowers')
                 .update({ name: editForm.name })
                 .eq('id', loan.borrower.id);
-            if (borrowerError) throw borrowerError;
+
+            if (borrowerError) {
+                if (borrowerError.message.includes("policy")) {
+                    alert("Database Error: You need to enable 'Update' permissions in Supabase.\n\nRun this SQL:\ncreate policy \"Users can update own borrowers\" on borrowers for update using (auth.uid() = user_id);");
+                }
+                throw borrowerError;
+            }
 
             // 2. Update Loan Details
             // Convert rate back to decimal
             let rateDecimal = editForm.interest_rate;
             if (editForm.rate_interval === 'ANNUALLY') rateDecimal = editForm.interest_rate / 100;
             else if (editForm.rate_interval === 'DAILY') rateDecimal = editForm.interest_rate / 100;
-            else rateDecimal = editForm.interest_rate / 100; // Monthly 2% -> 0.02 stored
+            else rateDecimal = editForm.interest_rate / 100;
+
+            // Calculate delta for principal to keep math consistent
+            const principalDelta = editForm.principal_amount - loan.principal_amount;
+            const newCurrentPrincipal = loan.current_principal + principalDelta;
 
             const { error: loanUpdateError } = await supabase
                 .from('loans')
                 .update({
                     principal_amount: editForm.principal_amount,
-                    // If principal changed, should we update current_principal? 
-                    // For simplicity, let's assume editing principal RESETS the loan or adjusts it delta. 
-                    // Actually, modifying past loans is tricky. 
-                    // Let's just update the reference 'principal_amount' and 'interest_rate'. 
-                    // Start date change might require re-calc of EVERYTHING.
-                    // For now, simple metadata updates. Re-calculating history is complex.
+                    current_principal: newCurrentPrincipal,
                     interest_rate: rateDecimal,
                     rate_interval: editForm.rate_interval,
                     start_date: editForm.start_date,
@@ -173,20 +178,25 @@ export default function LoanDetail() {
             if (loanUpdateError) throw loanUpdateError;
 
             setIsEditing(false);
-            fetchLoanData();
-            alert('Loan details updated!');
+            await fetchLoanData();
+            alert('Loan details updated successfully!');
         } catch (e: any) {
-            alert('Update Error: ' + e.message);
+            console.error(e);
+            if (!e.message.includes("policy")) alert('Update Error: ' + e.message);
         }
     };
 
     const handleForecast = () => {
-        if (!forecastDate) return;
+        if (!forecastDate) {
+            alert('Please select a future date.');
+            return;
+        }
         const target = new Date(forecastDate);
-        const lastAccrual = new Date(loan.last_accrual_date);
+        const startPoint = new Date(); // Forecast from now
+        setForecastResult(null);
 
         // Diff in days
-        const diffTime = target.getTime() - lastAccrual.getTime();
+        const diffTime = target.getTime() - startPoint.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
         if (diffDays <= 0) {
@@ -213,13 +223,13 @@ export default function LoanDetail() {
             projectedInterest = amount - base;
         }
 
-        // Add existing accrued
-        projectedInterest += loan.accrued_interest;
+        // Add existing accrued interest to get TRUE total
+        const finalTotal = loan.current_principal + loan.accrued_interest + projectedInterest;
 
         setForecastResult({
             days: diffDays,
             interest: projectedInterest,
-            total: loan.current_principal + projectedInterest
+            total: finalTotal
         });
     };
 
