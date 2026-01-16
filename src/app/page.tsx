@@ -132,7 +132,7 @@ export default function Dashboard() {
           <div>
             <div className="relative h-10 w-40 mb-1">
               <Image
-                src="/LendFlow.png"
+                src="/Logo.png"
                 alt="LendFlow"
                 fill
                 className="object-contain object-left"

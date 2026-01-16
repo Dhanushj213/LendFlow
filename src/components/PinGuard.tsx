@@ -57,7 +57,7 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
                 <div className="text-center mb-8">
                     <div className="relative h-16 w-48 mx-auto mb-2">
                         <Image
-                            src="/LendFlow.png"
+                            src="/Logo.png"
                             alt="LendFlow"
                             fill
                             className="object-contain"
