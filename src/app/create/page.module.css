@@ -1,0 +1,43 @@
+.formContainer {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.label {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    font-weight: 500;
+}
+
+.select {
+    height: 2.5rem;
+    border-radius: calc(var(--radius) - 2px);
+    border: 1px solid var(--input);
+    background-color: var(--card);
+    color: var(--foreground);
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+}
+
+.select:focus {
+    outline: none;
+    border-color: var(--ring);
+}
