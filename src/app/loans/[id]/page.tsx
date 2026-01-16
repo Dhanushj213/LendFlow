@@ -349,11 +349,11 @@ export default function LoanDetail() {
                                 {forecastResult && (
                                     <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mt-4 space-y-2">
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-zinc-400">Additional Days</span>
-                                            <span className="text-white font-mono">+{forecastResult.days}</span>
+                                            <span className="text-zinc-400">Calculation Days</span>
+                                            <span className="text-white font-mono">{forecastResult.days} days</span>
                                         </div>
                                         <div className="flex justify-between text-sm">
-                                            <span className="text-zinc-400">Projected Interest</span>
+                                            <span className="text-zinc-400">Total Interest</span>
                                             <span className="text-emerald-400 font-mono font-bold">
                                                 {formatCurrency(forecastResult.interest)}
                                             </span>
