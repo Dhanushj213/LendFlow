@@ -15,6 +15,16 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "LendFlow | Premium Interest Engine",
   description: "Private lending and automated interest tracking.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/LendFlow.png",
+    apple: "/LendFlow.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "LendFlow",
+  },
 };
 
 import PinGuard from "@/components/PinGuard";
