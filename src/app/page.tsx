@@ -56,6 +56,10 @@ interface Reminder {
   is_paid: boolean;
 }
 
+import AddEmiModal from '@/components/modals/AddEmiModal';
+import AddInsuranceModal from '@/components/modals/AddInsuranceModal';
+import AddReminderModal from '@/components/modals/AddReminderModal';
+
 export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [liabilities, setLiabilities] = useState<any[]>([]);
@@ -64,6 +68,11 @@ export default function Dashboard() {
   const [emis, setEmis] = useState<EMI[]>([]);
   const [insurance, setInsurance] = useState<Insurance[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+
+  // Modal States
+  const [showEmiModal, setShowEmiModal] = useState(false);
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
@@ -534,7 +543,10 @@ export default function Dashboard() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">Active EMIs</h3>
-                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                    <button
+                      onClick={() => setShowEmiModal(true)}
+                      className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors"
+                    >
                       + Add EMI
                     </button>
                   </div>
@@ -562,7 +574,10 @@ export default function Dashboard() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">Insurance Policies</h3>
-                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                    <button
+                      onClick={() => setShowInsuranceModal(true)}
+                      className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors"
+                    >
                       + Add Policy
                     </button>
                   </div>
@@ -590,7 +605,10 @@ export default function Dashboard() {
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-bold text-white">Other Reminders</h3>
-                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                    <button
+                      onClick={() => setShowReminderModal(true)}
+                      className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors"
+                    >
                       + Add Reminder
                     </button>
                   </div>
@@ -833,6 +851,32 @@ export default function Dashboard() {
 
         {/* Mobile View Toggle (Floating or bottom) can go here if needed, but header toggle works for now */}
       </div>
+
+      {/* EMI Modals */}
+      <AddEmiModal
+        isOpen={showEmiModal}
+        onClose={() => setShowEmiModal(false)}
+        onSuccess={async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) fetchLoans(user.id);
+        }}
+      />
+      <AddInsuranceModal
+        isOpen={showInsuranceModal}
+        onClose={() => setShowInsuranceModal(false)}
+        onSuccess={async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) fetchLoans(user.id);
+        }}
+      />
+      <AddReminderModal
+        isOpen={showReminderModal}
+        onClose={() => setShowReminderModal(false)}
+        onSuccess={async () => {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) fetchLoans(user.id);
+        }}
+      />
     </main >
   );
 }
