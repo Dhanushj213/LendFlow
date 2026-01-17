@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft, Pencil } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -73,6 +73,11 @@ export default function Dashboard() {
   const [showEmiModal, setShowEmiModal] = useState(false);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+
+  // Edit States
+  const [editingEmi, setEditingEmi] = useState<EMI | undefined>(undefined);
+  const [editingInsurance, setEditingInsurance] = useState<Insurance | undefined>(undefined);
+  const [editingReminder, setEditingReminder] = useState<Reminder | undefined>(undefined);
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
@@ -599,19 +604,26 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {emis.filter(e => e.status === 'ACTIVE').length === 0 ? (
                       <div className="text-zinc-500 text-sm italic">No active EMIs found.</div>
-                    ) : (
-                      emis.filter(e => e.status === 'ACTIVE').map(emi => (
-                        <div key={emi.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
-                          <div>
-                            <h4 className="text-white font-medium">{emi.name}</h4>
-                            <div className="text-xs text-zinc-500">{emi.lender} • {emi.remaining_months} months left</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
-                            <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
-                          </div>
+                    ) : emis.filter(e => e.status === 'ACTIVE').map(emi => (
+                      <div key={emi.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
+                        <div>
+                          <h4 className="text-white font-medium flex items-center gap-2">
+                            {emi.name}
+                            <button
+                              onClick={() => { setEditingEmi(emi); setShowEmiModal(true); }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </h4>
+                          <div className="text-xs text-zinc-500">{emi.lender} • {emi.remaining_months} months left</div>
                         </div>
-                      ))
+                        <div className="text-right">
+                          <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
+                          <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    ))
                     )}
                   </div>
                 </div>
@@ -630,19 +642,26 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {insurance.length === 0 ? (
                       <div className="text-zinc-500 text-sm italic">No insurance policies found.</div>
-                    ) : (
-                      insurance.map(pol => (
-                        <div key={pol.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
-                          <div>
-                            <h4 className="text-white font-medium">{pol.name}</h4>
-                            <div className="text-xs text-zinc-500">{pol.provider} • {pol.frequency}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
-                            <div className="text-xs text-zinc-500">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
-                          </div>
+                    ) : insurance.map(pol => (
+                      <div key={pol.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
+                        <div>
+                          <h4 className="text-white font-medium flex items-center gap-2">
+                            {pol.name}
+                            <button
+                              onClick={() => { setEditingInsurance(pol); setShowInsuranceModal(true); }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </h4>
+                          <div className="text-xs text-zinc-500">{pol.provider} • {pol.frequency}</div>
                         </div>
-                      ))
+                        <div className="text-right">
+                          <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
+                          <div className="text-xs text-zinc-500">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
+                        </div>
+                      </div>
+                    ))
                     )}
                   </div>
                 </div>
@@ -661,21 +680,28 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {reminders.length === 0 ? (
                       <div className="text-zinc-500 text-sm italic">No active reminders found.</div>
-                    ) : (
-                      reminders.map(rem => (
-                        <div key={rem.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
-                          <div>
-                            <h4 className="text-white font-medium">{rem.title}</h4>
-                            <div className="text-xs text-zinc-500">{rem.frequency}</div>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-white font-mono">{formatCurrency(rem.amount)}</div>
-                            <div className="text-xs text-emerald-500">
-                              {rem.is_paid ? 'Paid' : `Due: ${new Date(rem.next_due_date).toLocaleDateString()}`}
-                            </div>
+                    ) : reminders.map(rem => (
+                      <div key={rem.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
+                        <div>
+                          <h4 className="text-white font-medium flex items-center gap-2">
+                            {rem.title}
+                            <button
+                              onClick={() => { setEditingReminder(rem); setShowReminderModal(true); }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                          </h4>
+                          <div className="text-xs text-zinc-500">{rem.frequency}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white font-mono">{formatCurrency(rem.amount)}</div>
+                          <div className="text-xs text-emerald-500">
+                            {rem.is_paid ? 'Paid' : `Due: ${new Date(rem.next_due_date).toLocaleDateString()}`}
                           </div>
                         </div>
-                      ))
+                      </div>
+                    ))
                     )}
                   </div>
                 </div>
