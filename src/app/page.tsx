@@ -336,12 +336,17 @@ export default function Dashboard() {
               <Calendar className="w-3 h-3" /> EMIs & Reminders
             </button>
             {viewMode === 'borrowers' && (
-              <button
-                onClick={() => setShowMergeModal(true)}
-                className="ml-2 px-3 py-1.5 rounded-md text-xs font-medium text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 transition-all flex items-center gap-2"
-              >
-                <Merge className="w-3 h-3" /> Merge
-              </button>
+              <>
+                <div className="text-white p-8 text-center border border-zinc-800 border-dashed rounded-xl">
+                  Borrower View (Disabled for debugging)
+                </div>
+                <button
+                  onClick={() => setShowMergeModal(true)}
+                  className="ml-2 px-3 py-1.5 rounded-md text-xs font-medium text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 transition-all flex items-center gap-2"
+                >
+                  <Merge className="w-3 h-3" /> Merge
+                </button>
+              </>
             )}
           </div>
 
@@ -519,31 +524,9 @@ export default function Dashboard() {
         {/* List Content */}
         <section>
           <div className="grid gap-4">
-            {viewMode === 'emis' ? (
+            {viewMode === 'emis' && (
+              <>
               // EMI & REMINDERS VIEW
-              <div className="space-y-8">
-                {/* Stats for EMI Mode */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <span className="text-zinc-500 text-sm">Monthly EMIs</span>
-                    <div className="text-2xl font-bold text-white mt-1">
-                      {formatCurrency(emis.reduce((acc, e) => acc + (e.status === 'ACTIVE' ? e.amount : 0), 0))}
-                    </div>
-                  </div>
-                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <span className="text-zinc-500 text-sm">Insurance Premiums</span>
-                    <div className="text-2xl font-bold text-white mt-1">
-                      {formatCurrency(insurance.reduce((acc, i) => acc + i.premium_amount, 0))}
-                    </div>
-                  </div>
-                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
-                    <span className="text-zinc-500 text-sm">Active Reminders</span>
-                    <div className="text-2xl font-bold text-white mt-1">
-                      {formatCurrency(reminders.reduce((acc, r) => acc + (r.is_paid ? 0 : r.amount), 0))}
-                    </div>
-                  </div>
-                </div>
-
                 {/* Upcoming Payments (Next 30 Days) */}
                 <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-6 rounded-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
@@ -623,8 +606,7 @@ export default function Dashboard() {
                           <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
                         </div>
                       </div>
-                    ))
-                    )}
+                    ))}
                   </div>
                 </div>
 
@@ -661,8 +643,7 @@ export default function Dashboard() {
                           <div className="text-xs text-zinc-500">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
                         </div>
                       </div>
-                    ))
-                    )}
+                    ))}
                   </div>
                 </div>
 
@@ -701,254 +682,261 @@ export default function Dashboard() {
                           </div>
                         </div>
                       </div>
-                    ))
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {!['emis', 'borrowers'].includes(viewMode) && (
+              <>
+                {activeTab === 'active' ? (
+                  <>
+                    {/* ACTIVE LOANS */}
+                    {loans.filter(l => l.status === 'ACTIVE').length === 0 ? (
+                      <div className="text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
+                        No active loans found.
+                      </div>
+                    ) : (
+                      loans.filter(l => l.status === 'ACTIVE').map(loan => (
+                        <Link
+                          href={`/loans/${loan.id}`}
+                          key={loan.id}
+                          className="block group relative"
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
+                          <div className="glass-panel p-5 rounded-xl hover:border-emerald-500/50 transition-colors">
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
+                                  {loan.borrower_id ? (
+                                    <Link
+                                      href={(loan as any).title ? `/loans/${loan.id}` : `/borrowers/${loan.borrower_id}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="hover:underline"
+                                    >
+                                      {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
+                                    </Link>
+                                  ) : (
+                                    <span className="text-zinc-300">{(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}</span>
+                                  )}
+                                </h3>
+                                <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
+                                  <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">
+                                    {(loan.interest_rate * 100).toFixed(2)}% {loan.rate_interval}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-right">
+                                <div className="text-xl font-mono font-medium text-white">
+                                  {formatCurrency(loan.current_principal + loan.accrued_interest)}
+                                </div>
+                                <div className="text-xs text-zinc-500 mt-1">
+                                  Total Due
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      ))
                     )}
-                  </div>
-                </div>
-
-              </div>
-            ) : viewMode === 'borrowers' ? (
-              // BORROWER VIEW
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {groupedBorrowers.length === 0 ? (
-                  <div className="col-span-full text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
-                    No borrowers found.
-                  </div>
+                  </>
                 ) : (
-                  groupedBorrowers.map((b: any) => (
-                    <Link
-                      key={b.id}
-                      href={`/borrowers/${b.id}`}
-                      className="glass-panel p-5 rounded-xl block hover:border-emerald-500/50 transition-colors group"
-                    >
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">{b.name}</h3>
-                          <div className="text-xs text-zinc-500 mt-1">{b.activeCount} Active Loans</div>
-                        </div>
-                        <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-500 transition-colors">
-                          <Users className="w-4 h-4" />
-                        </div>
+                  <>
+                    {/* CLOSED LOANS */}
+                    {loans.filter(l => l.status === 'CLOSED').length === 0 ? (
+                      <div className="text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
+                        No closed loans found in history.
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
-                        <div>
-                          <span className="text-xs text-zinc-500 block mb-1">Total Principal</span>
-                          <span className="text-white font-mono">{formatCurrency(b.totalPrincipal)}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-xs text-zinc-500 block mb-1">Total Interest</span>
-                          <span className="text-blue-400 font-mono">{formatCurrency(b.totalInterest)}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  ))
-                )}
-              </div>
-            ) : activeTab === 'active' ? (
-              // ACTIVE LOANS
-              loans.filter(l => l.status === 'ACTIVE').length === 0 ? (
-                <div className="text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
-                  No active loans found.
-                </div>
-              ) : (
-                loans.filter(l => l.status === 'ACTIVE').map(loan => (
-                  <Link
-                    href={`/loans/${loan.id}`}
-                    key={loan.id}
-                    className="block group relative"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl" />
-                    <div className="glass-panel p-5 rounded-xl hover:border-emerald-500/50 transition-colors">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
-                            {loan.borrower_id ? (
-                              <Link
-                                href={(loan as any).title ? `/loans/${loan.id}` : `/borrowers/${loan.borrower_id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="hover:underline"
-                              >
+                    ) : (
+                      loans.filter(l => l.status === 'CLOSED').map(loan => (
+                        <div key={loan.id} className="glass-panel p-6 rounded-xl">
+                          <div className="flex justify-between items-start mb-6">
+                            <div>
+                              <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">
                                 {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
-                              </Link>
-                            ) : (
-                              <span className="text-zinc-300">{(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}</span>
-                            )}
-                          </h3>
-                          <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
-                            <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">
-                              {(loan.interest_rate * 100).toFixed(2)}% {loan.rate_interval}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-xl font-mono font-medium text-white">
-                            {formatCurrency(loan.current_principal + loan.accrued_interest)}
-                          </div>
-                          <div className="text-xs text-zinc-500 mt-1">
-                            Total Due
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))
-              )
-            ) : (
-              // CLOSED LOANS
-              loans.filter(l => l.status === 'CLOSED').length === 0 ? (
-                <div className="text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
-                  No closed loans found in history.
-                </div>
-              ) : (
-                loans.filter(l => l.status === 'CLOSED').map(loan => (
-                  <div key={loan.id} className="glass-panel p-6 rounded-xl">
-                    <div className="flex justify-between items-start mb-6">
-                      <div>
-                        <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">
-                          {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
-                        </h3>
-                        <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
-                          <History className="w-3 h-3" /> Settled
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-2xl font-bold text-white">
-                          {formatCurrency(loan.principal_amount)}
-                        </div>
-                        <span className="text-xs text-zinc-500">Original Principal</span>
-                      </div>
-                    </div>
-
-                    {/* Payment History for Closed Loan */}
-                    <div className="bg-zinc-950/50 rounded-lg p-4 border border-zinc-800/50">
-                      <h4 className="text-sm font-medium text-zinc-400 mb-3 flex items-center gap-2">
-                        <Calendar className="w-4 h-4" /> Repayment History
-                      </h4>
-                      <div className="space-y-3">
-                        {loan.transactions?.filter(t => t.type === 'PAYMENT').length === 0 ? (
-                          <p className="text-xs text-zinc-600 italic">No payments recorded.</p>
-                        ) : (
-                          loan.transactions.filter(t => t.type === 'PAYMENT').map(tx => (
-                            <div key={tx.id} className="flex justify-between items-center text-sm border-b border-zinc-800/50 pb-2 last:border-0 last:pb-0">
-                              <span className="text-zinc-500">
-                                {new Date(tx.created_at).toLocaleDateString(undefined, {
-                                  year: 'numeric', month: 'short', day: 'numeric',
-                                  hour: '2-digit', minute: '2-digit'
-                                })}
-                              </span>
-                              <span className="font-mono text-emerald-400">
-                                {formatCurrency(tx.amount)}
+                              </h3>
+                              <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                <History className="w-3 h-3" /> Settled
                               </span>
                             </div>
-                          ))
-                        )}
-                      </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-white">
+                                {formatCurrency(loan.principal_amount)}
+                              </div>
+                              <span className="text-xs text-zinc-500">Original Principal</span>
+                            </div>
+                          </div>
+
+                          {/* Payment History for Closed Loan */}
+                          <div className="bg-zinc-950/50 rounded-lg p-4 border border-zinc-800/50">
+                            <h4 className="text-sm font-medium text-zinc-400 mb-3 flex items-center gap-2">
+                              <Calendar className="w-4 h-4" /> Repayment History
+                            </h4>
+                            <div className="space-y-3">
+                              {loan.transactions?.filter(t => t.type === 'PAYMENT').length === 0 ? (
+                                <p className="text-xs text-zinc-600 italic">No payments recorded.</p>
+                              ) : (
+                                loan.transactions.filter(t => t.type === 'PAYMENT').map(tx => (
+                                  <div key={tx.id} className="flex justify-between items-center text-sm border-b border-zinc-800/50 pb-2 last:border-0 last:pb-0">
+                                    <span className="text-zinc-500">
+                                      {new Date(tx.created_at).toLocaleDateString(undefined, {
+                                        year: 'numeric', month: 'short', day: 'numeric',
+                                        hour: '2-digit', minute: '2-digit'
+                                      })}
+                                    </span>
+                                    <span className="font-mono text-emerald-400">
+                                      {formatCurrency(tx.amount)}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {viewMode === 'borrowers' && (
+              groupedBorrowers.map(b => (
+                <Link
+                  key={b.id}
+                  href={`/borrowers/${b.id}`}
+                  className="glass-panel p-5 rounded-xl block hover:border-emerald-500/50 transition-colors group"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div>
+                      <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">{b.name}</h3>
+                      <div className="text-xs text-zinc-500 mt-1">{b.activeCount} Active Loans</div>
+                    </div>
+                    <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-500 transition-colors">
+                      <Users className="w-4 h-4" />
                     </div>
                   </div>
-                ))
-              )
+
+                  <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
+                    <div>
+                      <span className="text-xs text-zinc-500 block mb-1">Total Principal</span>
+                      <span className="text-white font-mono">{formatCurrency(b.totalPrincipal)}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs text-zinc-500 block mb-1">Total Interest</span>
+                      <span className="text-blue-400 font-mono">{formatCurrency(b.totalInterest)}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))
             )}
-          </div>
-        </section>
+
+
+          </div >
+        </section >
 
         {/* Merge Modal */}
-        {showMergeModal && (
-          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <Merge className="w-5 h-5 text-emerald-500" />
-                Merge Borrowers
-              </h3>
+        {
+          showMergeModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+                <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                  <Merge className="w-5 h-5 text-emerald-500" />
+                  Merge Borrowers
+                </h3>
 
-              <div className="flex-1 overflow-y-auto min-h-0 mb-4 space-y-2">
-                <p className="text-sm text-zinc-500 mb-2">Select borrowers to merge (Minimum 2):</p>
-                {groupedBorrowers.map((b: any) => (
-                  <div
-                    key={b.id}
-                    onClick={() => {
-                      if (selectedForMerge.includes(b.id)) {
-                        setSelectedForMerge(prev => prev.filter(id => id !== b.id));
-                      } else {
-                        setSelectedForMerge(prev => [...prev, b.id]);
-                      }
-                    }}
-                    className={`p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center ${selectedForMerge.includes(b.id)
-                      ? 'bg-emerald-500/10 border-emerald-500/50 text-white'
-                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                  >
-                    <span>{b.name}</span>
-                    {selectedForMerge.includes(b.id) && <Check className="w-4 h-4 text-emerald-500" />}
-                  </div>
-                ))}
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-zinc-500 block mb-1">New Group Name</label>
-                  <input
-                    type="text"
-                    value={mergeName}
-                    onChange={e => setMergeName(e.target.value)}
-                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                    placeholder="e.g. Family Group"
-                  />
+                <div className="flex-1 overflow-y-auto min-h-0 mb-4 space-y-2">
+                  <p className="text-sm text-zinc-500 mb-2">Select borrowers to merge (Minimum 2):</p>
+                  {groupedBorrowers.map((b: any) => (
+                    <div
+                      key={b.id}
+                      onClick={() => {
+                        if (selectedForMerge.includes(b.id)) {
+                          setSelectedForMerge(prev => prev.filter(id => id !== b.id));
+                        } else {
+                          setSelectedForMerge(prev => [...prev, b.id]);
+                        }
+                      }}
+                      className={`p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center ${selectedForMerge.includes(b.id)
+                        ? 'bg-emerald-500/10 border-emerald-500/50 text-white'
+                        : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                        }`}
+                    >
+                      <span>{b.name}</span>
+                      {selectedForMerge.includes(b.id) && <Check className="w-4 h-4 text-emerald-500" />}
+                    </div>
+                  ))}
                 </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowMergeModal(false);
-                      setSelectedForMerge([]);
-                      setMergeName('');
-                    }}
-                    className="flex-1 py-3 rounded-xl font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleMerge}
-                    disabled={selectedForMerge.length < 2 || !mergeName.trim()}
-                    className="flex-1 py-3 rounded-xl font-medium bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Confirm Merge
-                  </button>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-zinc-500 block mb-1">New Group Name</label>
+                    <input
+                      type="text"
+                      value={mergeName}
+                      onChange={e => setMergeName(e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                      placeholder="e.g. Family Group"
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setShowMergeModal(false);
+                        setSelectedForMerge([]);
+                        setMergeName('');
+                      }}
+                      className="flex-1 py-3 rounded-xl font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleMerge}
+                      disabled={selectedForMerge.length < 2 || !mergeName.trim()}
+                      className="flex-1 py-3 rounded-xl font-medium bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Confirm Merge
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         {/* Mobile View Toggle (Floating or bottom) can go here if needed, but header toggle works for now */}
-      </div>
-
-      {/* EMI Modals */}
-      <AddEmiModal
-        isOpen={showEmiModal}
-        onClose={() => setShowEmiModal(false)}
-        onSuccess={async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) fetchLoans(user.id);
-        }}
-      />
-      <AddInsuranceModal
-        isOpen={showInsuranceModal}
-        onClose={() => setShowInsuranceModal(false)}
-        onSuccess={async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) fetchLoans(user.id);
-        }}
-      />
-      <AddReminderModal
-        isOpen={showReminderModal}
-        onClose={() => setShowReminderModal(false)}
-        onSuccess={async () => {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) fetchLoans(user.id);
-        }}
-      />
+        {/* EMI Modals */}
+        <AddEmiModal
+          isOpen={showEmiModal}
+          onClose={() => { setShowEmiModal(false); setEditingEmi(undefined); }}
+          onSuccess={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) fetchLoans(user.id);
+          }}
+          initialData={editingEmi}
+        />
+        <AddInsuranceModal
+          isOpen={showInsuranceModal}
+          onClose={() => { setShowInsuranceModal(false); setEditingInsurance(undefined); }}
+          onSuccess={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) fetchLoans(user.id);
+          }}
+          initialData={editingInsurance}
+        />
+        <AddReminderModal
+          isOpen={showReminderModal}
+          onClose={() => { setShowReminderModal(false); setEditingReminder(undefined); }}
+          onSuccess={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) fetchLoans(user.id);
+          }}
+          initialData={editingReminder}
+        />
+      </div >
     </main >
   );
 }
