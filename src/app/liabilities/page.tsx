@@ -286,6 +286,7 @@ export default function Liabilities() {
                                 setIsEditing(false);
                                 setForm({
                                     lender_name: '',
+                                    title: '',
                                     principal_amount: '',
                                     interest_rate: '',
                                     rate_interval: 'ANNUALLY',
