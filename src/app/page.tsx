@@ -446,7 +446,11 @@ export default function Dashboard() {
                         <div>
                           <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
                             {loan.borrower_id ? (
-                              <Link href={`/borrowers/${loan.borrower_id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                              <Link
+                                href={(loan as any).title ? `/loans/${loan.id}` : `/borrowers/${loan.borrower_id}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="hover:underline"
+                              >
                                 {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
                               </Link>
                             ) : (

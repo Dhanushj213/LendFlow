@@ -77,7 +77,7 @@ export default function LoanDetail() {
 
             // Initialize Edit Form
             setEditForm({
-                name: loanData.borrower.name,
+                name: loanData.title || loanData.borrower.name,
                 principal_amount: loanData.principal_amount,
                 interest_rate: (loanData.interest_rate * (loanData.rate_interval === 'ANNUALLY' || loanData.rate_interval === 'DAILY' ? 100 : 1)), // Convert back to %
                 rate_interval: loanData.rate_interval,
@@ -139,17 +139,30 @@ export default function LoanDetail() {
     const handleEditSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // 1. Update Borrower Name
-            const { error: borrowerError } = await supabase
-                .from('borrowers')
-                .update({ name: editForm.name })
-                .eq('id', loan.borrower.id);
+            // 1. Update Name (Borrower or Loan Title)
+            const isMergedLoan = (loan as any).title; // Check if it was merged
 
-            if (borrowerError) {
-                if (borrowerError.message.includes("policy")) {
-                    alert("Database Error: You need to enable 'Update' permissions in Supabase.\n\nRun this SQL:\ncreate policy \"Users can update own borrowers\" on borrowers for update using (auth.uid() = user_id);");
+            if (isMergedLoan) {
+                // Update Loan Title
+                const { error: titleError } = await supabase
+                    .from('loans')
+                    .update({ title: editForm.name })
+                    .eq('id', id);
+
+                if (titleError) throw titleError;
+            } else {
+                // Update Borrower Group Name
+                const { error: borrowerError } = await supabase
+                    .from('borrowers')
+                    .update({ name: editForm.name })
+                    .eq('id', loan.borrower.id);
+
+                if (borrowerError) {
+                    if (borrowerError.message.includes("policy")) {
+                        alert("Database Error: You need to enable 'Update' permissions in Supabase.\n\nRun this SQL:\ncreate policy \"Users can update own borrowers\" on borrowers for update using (auth.uid() = user_id);");
+                    }
+                    throw borrowerError;
                 }
-                throw borrowerError;
             }
 
             // 2. Update Loan Details
@@ -387,7 +400,7 @@ export default function LoanDetail() {
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-2xl md:text-3xl font-bold text-white">{loan.borrower?.name}</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white">{(loan as any).title || loan.borrower?.name}</h1>
                             <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
                                 <Pencil className="w-4 h-4" />
                             </button>
