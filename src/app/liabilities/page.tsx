@@ -19,6 +19,7 @@ interface Liability {
     accrued_interest?: number;
     total_due?: number;
     days_elapsed?: number;
+    title?: string;
 }
 
 export default function Liabilities() {
@@ -38,6 +39,7 @@ export default function Liabilities() {
 
     const [form, setForm] = useState({
         lender_name: '',
+        title: '',
         principal_amount: '',
         interest_rate: '',
         rate_interval: 'ANNUALLY',
@@ -109,6 +111,7 @@ export default function Liabilities() {
             const payload = {
                 user_id: user.id,
                 lender_name: form.lender_name,
+                title: form.title || null,
                 principal_amount: parseFloat(form.principal_amount),
                 interest_rate: parseFloat(form.interest_rate) / 100, // % to Decimal
                 rate_interval: form.rate_interval as any,
@@ -129,6 +132,7 @@ export default function Liabilities() {
             setEditId(null);
             setForm({
                 lender_name: '',
+                title: '',
                 principal_amount: '',
                 interest_rate: '',
                 rate_interval: 'ANNUALLY',
@@ -144,6 +148,7 @@ export default function Liabilities() {
     const handleEditClick = (l: Liability) => {
         setForm({
             lender_name: l.lender_name,
+            title: (l as any).title || '',
             principal_amount: l.principal_amount.toString(),
             interest_rate: (l.interest_rate * 100).toString(), // Decimal to %
             rate_interval: l.rate_interval,
@@ -169,13 +174,24 @@ export default function Liabilities() {
     const handleMerge = async () => {
         if (!mergeName.trim() || selectedIds.length === 0) return;
         try {
-            // Batch update lender_name
-            const { error } = await supabase
-                .from('personal_borrowings')
-                .update({ lender_name: mergeName })
-                .in('id', selectedIds);
+            // 1. Get current items to preserve names
+            const itemsToMerge = liabilities.filter(l => selectedIds.includes(l.id));
 
-            if (error) throw error;
+            // 2. Perform updates to preserve individual titles
+            const updates = itemsToMerge.map(item => {
+                const needsTitlePreservation = !(item as any).title;
+                const newTitle = needsTitlePreservation ? item.lender_name : (item as any).title;
+
+                return supabase
+                    .from('personal_borrowings')
+                    .update({
+                        lender_name: mergeName,
+                        title: newTitle
+                    })
+                    .eq('id', item.id);
+            });
+
+            await Promise.all(updates);
 
             setShowMergeModal(false);
             setMergeName('');
@@ -307,10 +323,26 @@ export default function Liabilities() {
                             <button type="button" onClick={() => setIsAdding(false)} className="text-zinc-500 hover:text-white"><AlertCircle className="w-5 h-5" /></button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Lender Name</label>
-                                <input required type="text" value={form.lender_name} onChange={e => setForm({ ...form, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="e.g. Bank, Friend" />
-                            </div>
+                            {/* Smart Name Fields */}
+                            {isEditing && (form.title || form.lender_name) ? (
+                                <>
+                                    <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
+                                        <div>
+                                            <label className="text-xs text-zinc-400 block mb-1">Group / Lender</label>
+                                            <input required type="text" value={form.lender_name} onChange={e => setForm({ ...form, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Group Name" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-zinc-400 block mb-1">Individual Title (Optional)</label>
+                                            <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Specific Loan Title" />
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="col-span-1 md:col-span-2">
+                                    <label className="text-xs text-zinc-400 block mb-1">Lender Name</label>
+                                    <input required type="text" value={form.lender_name} onChange={e => setForm({ ...form, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="e.g. Bank, Friend" />
+                                </div>
+                            )}
                             <div>
                                 <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
                                 <input required type="number" value={form.principal_amount} onChange={e => setForm({ ...form, principal_amount: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="0.00" />
@@ -371,7 +403,14 @@ export default function Liabilities() {
                                     <div className="pl-8"> {/* Indent for checkbox */}
                                         <div className="flex justify-between items-start mb-4">
                                             <div>
-                                                <h3 className="text-lg font-medium text-white">{l.lender_name}</h3>
+                                                <h3 className="text-lg font-medium text-white">
+                                                    {(l as any).title || l.lender_name}
+                                                    {(l as any).title && (
+                                                        <span className="ml-3 px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs border border-zinc-700">
+                                                            Group: {l.lender_name}
+                                                        </span>
+                                                    )}
+                                                </h3>
                                                 <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                                                     <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-white">
                                                         {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
@@ -418,9 +457,11 @@ export default function Liabilities() {
                                             <div key={l.id} className="bg-black/50 border border-zinc-800 p-4 rounded-lg flex justify-between items-center">
                                                 <div>
                                                     <div className="text-sm text-white font-medium">
+                                                        {(l as any).title || 'Untitled Portfolio'}
+                                                    </div>
+                                                    <div className="text-xs text-zinc-500">
                                                         {formatCurrency(l.principal_amount)} @ {(l.interest_rate * 100).toFixed(2)}%
                                                     </div>
-                                                    <div className="text-xs text-zinc-500">{new Date(l.start_date).toLocaleDateString()}</div>
                                                 </div>
                                                 <div className="text-right">
                                                     <div className="text-sm font-bold text-red-400">{formatCurrency(l.accrued_interest)}</div>
