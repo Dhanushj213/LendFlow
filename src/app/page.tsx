@@ -397,6 +397,25 @@ export default function Dashboard() {
     };
   };
 
+  const handleDeleteItem = async (id: string, table: 'insurance_policies' | 'reminders' | 'mutual_fund_sips') => {
+    if (!confirm('Are you sure you want to delete this item? This cannot be undone.')) return;
+
+    try {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+
+      // Optimistic Update
+      if (table === 'insurance_policies') setInsurance(prev => prev.filter(i => i.id !== id));
+      if (table === 'reminders') setReminders(prev => prev.filter(r => r.id !== id));
+      if (table === 'mutual_fund_sips') setSips(prev => prev.filter(s => s.id !== id));
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+    } catch (e) {
+      console.error('Delete error:', e);
+      alert('Failed to delete item');
+    }
+  };
+
   // Payment Logic
   const initiatePayment = (item: any, category: 'EMI' | 'INSURANCE' | 'REMINDER' | 'SIP') => {
     // Derive title immediately to ensure it's captured
@@ -467,6 +486,12 @@ export default function Dashboard() {
           updates.next_due_date = nextDue.toISOString().split('T')[0];
           updates.is_paid = false; // Reset paid status for next cycle
         }
+      }
+      else if (paymentCategory === 'SIP') {
+        table = 'mutual_fund_sips';
+        // SIP Logic: +1 Month
+        nextDue.setMonth(nextDue.getMonth() + 1);
+        updates.next_due_date = nextDue.toISOString().split('T')[0];
       }
 
       // 3. Update Item
@@ -1153,6 +1178,13 @@ export default function Dashboard() {
                               >
                                 <Check className="w-3 h-3" />
                               </button>
+                              <button
+                                onClick={() => handleDeleteItem(pol.id, 'insurance_policies')}
+                                className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                title="Delete Policy"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -1191,8 +1223,24 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-white font-mono">{formatCurrency(rem.amount)}</div>
-                          <div className="text-xs text-emerald-500">
+                          <div className="text-xs text-emerald-500 mb-2">
                             {rem.is_paid ? 'Paid' : `Due: ${new Date(rem.next_due_date).toLocaleDateString()}`}
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => initiatePayment(rem, 'REMINDER')}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                              title="Mark Paid"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(rem.id, 'reminders')}
+                              className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                              title="Delete Reminder"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1224,8 +1272,24 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-white font-mono">{formatCurrency(sip.amount)}</div>
-                          <div className="text-xs text-emerald-500">
+                          <div className="text-xs text-emerald-500 mb-2">
                             Due: {new Date(sip.next_due_date).toLocaleDateString()}
+                          </div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => initiatePayment(sip, 'SIP')}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                              title="Mark Paid"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteItem(sip.id, 'mutual_fund_sips')}
+                              className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                              title="Delete SIP"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
                           </div>
                         </div>
                       </div>
