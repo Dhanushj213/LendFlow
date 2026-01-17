@@ -50,7 +50,18 @@ export default function Liabilities() {
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebratedItem, setCelebratedItem] = useState<Liability | null>(null);
 
-    const [form, setForm] = useState({
+    // Form State (Single Item for Editing, Multi for Adding)
+    const [commonForm, setCommonForm] = useState({
+        lender_name: '',
+        start_date: new Date().toISOString().split('T')[0]
+    });
+
+    const [tranches, setTranches] = useState([
+        { title: 'Principal', principal_amount: '', interest_rate: '12', rate_interval: 'ANNUALLY' }
+    ]);
+
+    // Legacy edit form state for backward compatibility with Edit Mode
+    const [editForm, setEditForm] = useState({
         lender_name: '',
         title: '',
         principal_amount: '',
@@ -119,26 +130,38 @@ export default function Liabilities() {
         e.preventDefault();
         try {
             const { data: { user } } = await supabase.auth.getUser();
-            if (!user) return;
-
-            const payload = {
-                user_id: user.id,
-                lender_name: form.lender_name,
-                title: form.title || null,
-                principal_amount: parseFloat(form.principal_amount),
-                interest_rate: parseFloat(form.interest_rate) / 100, // % to Decimal
-                rate_interval: form.rate_interval as any,
-                start_date: form.start_date,
-                status: 'ACTIVE'
-            };
+            if (!user) {
+                router.push('/auth');
+                return;
+            }
 
             if (isEditing && editId) {
-                // Remove status from update payload to avoid overwriting closed status if editing
-                const { status, ...updatePayload } = payload;
-                const { error } = await supabase.from('personal_borrowings').update(updatePayload).eq('id', editId);
+                // EDIT MODE (Single Item)
+                const payload = {
+                    lender_name: editForm.lender_name,
+                    title: editForm.title || null,
+                    principal_amount: parseFloat(editForm.principal_amount),
+                    interest_rate: parseFloat(editForm.interest_rate) / 100,
+                    rate_interval: editForm.rate_interval as any,
+                    start_date: editForm.start_date,
+                    // status is removed from update payload to preserve current status
+                };
+                const { error } = await supabase.from('personal_borrowings').update(payload).eq('id', editId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('personal_borrowings').insert(payload);
+                // ADD MODE (Multi Tranche)
+                const payloads = tranches.map(t => ({
+                    user_id: user.id,
+                    lender_name: commonForm.lender_name,
+                    title: t.title || null,
+                    principal_amount: parseFloat(t.principal_amount),
+                    interest_rate: parseFloat(t.interest_rate) / 100,
+                    rate_interval: t.rate_interval as any,
+                    start_date: commonForm.start_date,
+                    status: 'ACTIVE'
+                }));
+
+                const { error } = await supabase.from('personal_borrowings').insert(payloads);
                 if (error) throw error;
             }
 
@@ -146,14 +169,13 @@ export default function Liabilities() {
             setIsAdding(false);
             setIsEditing(false);
             setEditId(null);
-            setForm({
+            setCommonForm({
                 lender_name: '',
-                title: '',
-                principal_amount: '',
-                interest_rate: '',
-                rate_interval: 'ANNUALLY',
                 start_date: new Date().toISOString().split('T')[0]
             });
+            setTranches([
+                { title: 'Principal', principal_amount: '', interest_rate: '12', rate_interval: 'ANNUALLY' }
+            ]);
             fetchLiabilities();
         } catch (e: any) {
             console.error(e);
@@ -162,17 +184,18 @@ export default function Liabilities() {
     };
 
     const handleEditClick = (l: Liability) => {
-        setForm({
+        setIsEditing(true);
+        setEditId(l.id);
+        setIsAdding(true);
+        // Populate Single Edit Form
+        setEditForm({
             lender_name: l.lender_name,
-            title: (l as any).title || '',
+            title: l.title || '',
             principal_amount: l.principal_amount.toString(),
-            interest_rate: (l.interest_rate * 100).toString(), // Decimal to %
+            interest_rate: (l.interest_rate * 100).toString(),
             rate_interval: l.rate_interval,
             start_date: l.start_date
         });
-        setEditId(l.id);
-        setIsEditing(true);
-        setIsAdding(true); // Reuse the add modal/form visibility
     };
 
     const handleDeleteClick = (id: string, e?: React.MouseEvent) => {
@@ -432,14 +455,14 @@ export default function Liabilities() {
                             onClick={() => {
                                 setIsAdding(!isAdding);
                                 setIsEditing(false);
-                                setForm({
+                                // Reset to Add Mode Defaults
+                                setCommonForm({
                                     lender_name: '',
-                                    title: '',
-                                    principal_amount: '',
-                                    interest_rate: '',
-                                    rate_interval: 'ANNUALLY',
                                     start_date: new Date().toISOString().split('T')[0]
                                 });
+                                setTranches([
+                                    { title: 'Principal', principal_amount: '', interest_rate: '12', rate_interval: 'ANNUALLY' }
+                                ]);
                             }}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${isAdding && !isEditing ? 'bg-zinc-800 text-white' : 'bg-red-600 hover:bg-red-500 text-white shadow-lg shadow-red-900/20'}`}
                         >
@@ -471,62 +494,162 @@ export default function Liabilities() {
                             <h3 className="text-lg font-medium text-white">{isEditing ? 'Edit Borrowing' : 'Add New Borrowing'}</h3>
                             <button type="button" onClick={() => setIsAdding(false)} className="text-zinc-500 hover:text-white"><AlertCircle className="w-5 h-5" /></button>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Smart Name Fields */}
-                            {isEditing && (form.title || form.lender_name) ? (
-                                <>
-                                    <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
-                                        <div>
-                                            <label className="text-xs text-zinc-400 block mb-1">Group / Lender</label>
-                                            <input required type="text" value={form.lender_name} onChange={e => setForm({ ...form, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Group Name" />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-zinc-400 block mb-1">Individual Title (Optional)</label>
-                                            <input type="text" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Specific Loan Title" />
-                                        </div>
+
+                        {/* EDIT MODE FORM */}
+                        {isEditing ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="col-span-1 md:col-span-2 grid grid-cols-2 gap-4 bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Group / Lender</label>
+                                        <input required type="text" value={editForm.lender_name} onChange={e => setEditForm({ ...editForm, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Group Name" />
                                     </div>
-                                </>
-                            ) : (
-                                <div className="col-span-1 md:col-span-2">
-                                    <label className="text-xs text-zinc-400 block mb-1">Lender Name</label>
-                                    <input required type="text" value={form.lender_name} onChange={e => setForm({ ...form, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="e.g. Bank, Friend" />
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Individual Title (Optional)</label>
+                                        <input type="text" value={editForm.title} onChange={e => setEditForm({ ...editForm, title: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="Specific Loan Title" />
+                                    </div>
                                 </div>
-                            )}
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
-                                <input required type="number" value={form.principal_amount} onChange={e => setForm({ ...form, principal_amount: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="0.00" />
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Principal Amount</label>
+                                    <input required type="number" value={editForm.principal_amount} onChange={e => setEditForm({ ...editForm, principal_amount: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
+                                    <input required type="number" value={editForm.interest_rate} onChange={e => setEditForm({ ...editForm, interest_rate: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="12" />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Interval</label>
+                                    <select value={editForm.rate_interval} onChange={e => setEditForm({ ...editForm, rate_interval: e.target.value as any })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none">
+                                        <option value="ANNUALLY">Annually</option>
+                                        <option value="MONTHLY">Monthly</option>
+                                        <option value="DAILY">Daily</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
+                                    <input required type="date" value={editForm.start_date} onChange={e => setEditForm({ ...editForm, start_date: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" />
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
-                                <input required type="number" value={form.interest_rate} onChange={e => setForm({ ...form, interest_rate: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="12" />
+                        ) : (
+                            /* ADD MODE FORM (Multi-Tranche) */
+                            <div className="space-y-6">
+                                {/* Common Details */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-zinc-900/30 rounded-lg border border-zinc-800/50">
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Lender / Group Name</label>
+                                        <input required type="text" value={commonForm.lender_name} onChange={e => setCommonForm({ ...commonForm, lender_name: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" placeholder="e.g. HDFC Bank, Friend" />
+                                    </div>
+                                    <div>
+                                        <label className="text-xs text-zinc-400 block mb-1">Start Date (Applied to All)</label>
+                                        <input required type="date" value={commonForm.start_date} onChange={e => setCommonForm({ ...commonForm, start_date: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" />
+                                    </div>
+                                </div>
+
+                                {/* Tranches List */}
+                                <div className="space-y-3">
+                                    {tranches.map((t, idx) => (
+                                        <div key={idx} className="relative group bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors">
+                                            {tranches.length > 1 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTranches(prev => prev.filter((_, i) => i !== idx))}
+                                                    className="absolute top-2 right-2 p-1 text-zinc-600 hover:text-red-500 opacity-50 hover:opacity-100"
+                                                >
+                                                    <X className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+                                                <div className="md:col-span-4">
+                                                    <label className="text-[10px] text-zinc-500 block mb-1">Purpose / Title</label>
+                                                    <input
+                                                        type="text"
+                                                        value={t.title}
+                                                        onChange={e => {
+                                                            const newTranches = [...tranches];
+                                                            newTranches[idx].title = e.target.value;
+                                                            setTranches(newTranches);
+                                                        }}
+                                                        className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-sm text-white focus:border-zinc-600 outline-none"
+                                                        placeholder="e.g. Principal"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <label className="text-[10px] text-zinc-500 block mb-1">Amount</label>
+                                                    <input
+                                                        required
+                                                        type="number"
+                                                        value={t.principal_amount}
+                                                        onChange={e => {
+                                                            const newTranches = [...tranches];
+                                                            newTranches[idx].principal_amount = e.target.value;
+                                                            setTranches(newTranches);
+                                                        }}
+                                                        className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-sm text-white focus:border-emerald-500 outline-none font-mono"
+                                                        placeholder="0.00"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <label className="text-[10px] text-zinc-500 block mb-1">Rate (%)</label>
+                                                    <input
+                                                        required
+                                                        type="number"
+                                                        value={t.interest_rate}
+                                                        onChange={e => {
+                                                            const newTranches = [...tranches];
+                                                            newTranches[idx].interest_rate = e.target.value;
+                                                            setTranches(newTranches);
+                                                        }}
+                                                        className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-sm text-white focus:border-emerald-500 outline-none font-mono"
+                                                    />
+                                                </div>
+                                                <div className="md:col-span-3">
+                                                    <label className="text-[10px] text-zinc-500 block mb-1">Interval</label>
+                                                    <select
+                                                        value={t.rate_interval}
+                                                        onChange={e => {
+                                                            const newTranches = [...tranches];
+                                                            newTranches[idx].rate_interval = e.target.value;
+                                                            setTranches(newTranches);
+                                                        }}
+                                                        className="w-full bg-black border border-zinc-800 rounded-lg p-2 text-sm text-zinc-400 focus:border-zinc-600 outline-none"
+                                                    >
+                                                        <option value="ANNUALLY">Annually</option>
+                                                        <option value="MONTHLY">Monthly</option>
+                                                        <option value="DAILY">Daily</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    <button
+                                        type="button"
+                                        onClick={() => setTranches([...tranches, { title: '', principal_amount: '', interest_rate: '0', rate_interval: 'ANNUALLY' }])}
+                                        className="w-full py-2 border border-dashed border-zinc-800 rounded-lg text-xs text-zinc-500 hover:text-white hover:border-zinc-600 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Plus className="w-4 h-4" /> Add Another Component (e.g. Fees, Split Rate)
+                                    </button>
+                                </div>
                             </div>
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Interval</label>
-                                <select value={form.rate_interval} onChange={e => setForm({ ...form, rate_interval: e.target.value as any })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none">
-                                    <option value="ANNUALLY">Annually</option>
-                                    <option value="MONTHLY">Monthly</option>
-                                    <option value="DAILY">Daily</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Start Date</label>
-                                <input required type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3 text-white focus:border-red-500 outline-none" />
-                            </div>
-                        </div>
+                        )}
+
                         <div className="flex justify-end pt-4">
                             <button type="submit" className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-medium transition-colors">
-                                {isEditing ? 'Update Record' : 'Save Record'}
+                                {isEditing ? 'Update Record' : 'Save Borrowing'}
                             </button>
                         </div>
                     </form>
                 )}
 
-                {/* List Content */}
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-12 text-zinc-500">Loading liabilities...</div>
                     ) : filteredLiabilities.length === 0 ? (
-                        <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">No {statusTab.toLowerCase()} liabilities.</div>
+                        <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+                            No {statusTab.toLowerCase()} liabilities.
+                            {/* Shortuct to add if nothing exists */}
+                            {statusTab === 'ACTIVE' && (
+                                <button onClick={() => setIsAdding(true)} className="block mx-auto mt-4 text-red-500 hover:underline">Add your first borrowing</button>
+                            )}
+                        </div>
                     ) : (
                         viewMode === 'list' ? (
                             // LIST VIEW
