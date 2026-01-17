@@ -29,6 +29,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
     const [borrower, setBorrower] = useState<Borrower | null>(null);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [loading, setLoading] = useState(true);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const router = useRouter();
     const supabase = createClient();
 
@@ -181,7 +182,30 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
     };
 
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Loading Profile...</div>;
-    if (!borrower) return <div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Borrower not found</div>;
+    if (!borrower) return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center text-zinc-500 gap-4 p-4">
+            <h2 className="text-xl text-white">Borrower not found</h2>
+            <p className="text-zinc-600">ID: {params.id}</p>
+            {errorMsg && (
+                <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-xl max-w-md w-full">
+                    <p className="text-red-400 font-mono text-xs break-all">{errorMsg}</p>
+                    {errorMsg.includes("policy") && (
+                        <p className="text-zinc-400 text-xs mt-2">
+                            Tip: This is likely a permission issue. Please run the `fix_borrowers_rls.sql` script in Supabase.
+                        </p>
+                    )}
+                    {errorMsg.includes("JSON") && (
+                        <p className="text-zinc-400 text-xs mt-2">
+                            Tip: No data returned. The ID might be wrong or RLS policies are hiding the row.
+                        </p>
+                    )}
+                </div>
+            )}
+            <Link href="/" className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors">
+                Return to Dashboard
+            </Link>
+        </div>
+    );
 
     return (
         <main className="min-h-screen bg-black p-4 md:p-8">
