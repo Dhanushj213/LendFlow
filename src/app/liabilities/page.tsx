@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown, X } from 'lucide-react';
+import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown, X, History } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Liability {
@@ -49,6 +49,12 @@ export default function Liabilities() {
     // Celebration State
     const [showCelebration, setShowCelebration] = useState(false);
     const [celebratedItem, setCelebratedItem] = useState<Liability | null>(null);
+
+    // Details Modal State
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [selectedDetailId, setSelectedDetailId] = useState<string | null>(null);
+    const [transactionHistory, setTransactionHistory] = useState<any[]>([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
 
     // Form State (Single Item for Editing, Multi for Adding)
     const [commonForm, setCommonForm] = useState({
@@ -315,16 +321,58 @@ export default function Liabilities() {
         setShowRepayModal(false);
 
         try {
-            const { error } = await supabase
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('User not found');
+
+            // 1. Update Liability
+            const { error: updateError } = await supabase
                 .from('personal_borrowings')
                 .update(updates)
                 .eq('id', repayId);
 
-            if (error) throw error;
+            if (updateError) throw updateError;
+
+            // 2. Log Transaction
+            const { error: logError } = await supabase
+                .from('liability_transactions')
+                .insert({
+                    borrowing_id: repayId,
+                    user_id: user.id,
+                    amount: amount,
+                    transaction_type: 'REPAYMENT',
+                    notes: 'Partial Repayment via Dashboard'
+                });
+
+            if (logError) console.error('Error logging transaction:', logError); // Non-blocking
+
         } catch (e) {
             console.error(e);
             alert('Error processing repayment');
             fetchLiabilities();
+        }
+    };
+
+    const handleCardClick = (id: string) => {
+        setSelectedDetailId(id);
+        setShowDetailsModal(true);
+        fetchHistory(id);
+    };
+
+    const fetchHistory = async (id: string) => {
+        setHistoryLoading(true);
+        try {
+            const { data, error } = await supabase
+                .from('liability_transactions')
+                .select('*')
+                .eq('borrowing_id', id)
+                .order('transaction_date', { ascending: false });
+
+            if (error) throw error;
+            setTransactionHistory(data || []);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setHistoryLoading(false);
         }
     };
 
@@ -669,7 +717,11 @@ export default function Liabilities() {
                                 {/* Items List */}
                                 <div className="divide-y divide-zinc-800/50">
                                     {g.items.map((l: Liability) => (
-                                        <div key={l.id} className={`p-4 hover:bg-zinc-900/30 transition-colors relative group ${selectedIds.includes(l.id) ? 'bg-emerald-900/10' : ''}`}>
+                                        <div
+                                            key={l.id}
+                                            onClick={() => handleCardClick(l.id)}
+                                            className={`p-4 hover:bg-zinc-900/30 transition-colors relative group cursor-pointer ${selectedIds.includes(l.id) ? 'bg-emerald-900/10' : ''}`}
+                                        >
                                             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                 {/* Left: Info */}
                                                 <div className="flex items-start gap-3">
@@ -851,6 +903,82 @@ export default function Liabilities() {
                         <button onClick={() => setShowCelebration(false)} className="w-full py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200 transition-colors">
                             Awesome!
                         </button>
+                    </div>
+                </div>
+            )}
+            {/* Details Modal */}
+            {showDetailsModal && selectedDetailId && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowDetailsModal(false)}>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        {(() => {
+                            const item = liabilities.find(l => l.id === selectedDetailId);
+                            if (!item) return null;
+                            return (
+                                <>
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                {item.title || item.lender_name}
+                                                <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                                    {item.status}
+                                                </span>
+                                            </h3>
+                                            <div className="text-sm text-zinc-500 mt-1">{item.lender_name}</div>
+                                        </div>
+                                        <button onClick={() => setShowDetailsModal(false)} className="text-zinc-500 hover:text-white">
+                                            <X className="w-6 h-6" />
+                                        </button>
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-4 mb-6">
+                                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                                            <div className="text-xs text-zinc-500 mb-1">Principal Remaining</div>
+                                            <div className="text-lg font-mono text-white">{formatCurrency(item.principal_amount)}</div>
+                                        </div>
+                                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                                            <div className="text-xs text-zinc-500 mb-1">Total Due</div>
+                                            <div className="text-lg font-mono text-emerald-400">{formatCurrency(item.total_due || 0)}</div>
+                                            <div className="text-[10px] text-zinc-600 mt-1">
+                                                Incl. {formatCurrency(item.accrued_interest || 0)} Interest
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Transaction History */}
+                                    <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                        <History className="w-4 h-4 text-zinc-500" />
+                                        Transaction History
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {historyLoading ? (
+                                            <div className="text-center py-4 text-zinc-500 text-xs">Loading history...</div>
+                                        ) : transactionHistory.length === 0 ? (
+                                            <div className="text-center py-8 border border-dashed border-zinc-800 rounded-lg text-zinc-500 text-xs">
+                                                No transactions recorded yet.
+                                            </div>
+                                        ) : (
+                                            transactionHistory.map((t: any) => (
+                                                <div key={t.id} className="flex justify-between items-center p-3 bg-zinc-800/30 rounded-lg border border-zinc-800/50">
+                                                    <div>
+                                                        <div className="text-white text-sm font-medium">
+                                                            {t.transaction_type === 'REPAYMENT' ? 'Repayment' : t.transaction_type}
+                                                        </div>
+                                                        <div className="text-[10px] text-zinc-500">
+                                                            {new Date(t.created_at).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-emerald-400 font-mono text-sm">-{formatCurrency(t.amount)}</div>
+                                                        {t.notes && <div className="text-[10px] text-zinc-600">{t.notes}</div>}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
                 </div>
             )}
