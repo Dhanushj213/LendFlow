@@ -539,6 +539,52 @@ export default function Dashboard() {
                   </div>
                 </div>
 
+                {/* Upcoming Payments (Next 30 Days) */}
+                <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-6 rounded-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Calendar className="w-24 h-24 text-emerald-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-4 relative z-10">Upcoming Payments</h3>
+                  <div className="space-y-3 relative z-10">
+                    {(() => {
+                      const allItems = [
+                        ...emis.filter(e => e.status === 'ACTIVE').map(e => ({ ...e, type: 'EMI', date: e.next_due_date })),
+                        ...insurance.map(i => ({ ...i, type: 'INSURANCE', date: i.next_due_date, amount: i.premium_amount })),
+                        ...reminders.filter(r => !r.is_paid).map(r => ({ ...r, type: 'REMINDER', name: r.title, date: r.next_due_date }))
+                      ];
+
+                      const upcoming = allItems
+                        .filter(item => {
+                          const due = new Date(item.date);
+                          const today = new Date();
+                          const diffTime = due.getTime() - today.getTime();
+                          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                          return diffDays >= -5 && diffDays <= 30; // Show overdue (up to 5 days) + next 30 days
+                        })
+                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                        .slice(0, 5); // Show top 5
+
+                      if (upcoming.length === 0) return <div className="text-zinc-500 text-sm italic">No upcoming payments due soon.</div>;
+
+                      return upcoming.map((item, idx) => (
+                        <div key={`${item.type}-${item.id}-${idx}`} className="flex justify-between items-center bg-black/40 p-3 rounded-lg border border-zinc-800/50">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full ${item.type === 'EMI' ? 'bg-blue-500' : item.type === 'INSURANCE' ? 'bg-purple-500' : 'bg-orange-500'}`} />
+                            <div>
+                              <div className="text-white font-medium text-sm">{item.name}</div>
+                              <div className="text-[10px] text-zinc-500">{item.type} • {new Date(item.date).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-mono text-sm">{formatCurrency(item.amount)}</div>
+                            {new Date(item.date) < new Date() && <div className="text-[10px] text-red-400 font-bold">OVERDUE</div>}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
                 {/* EMIs List */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
