@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown, X, History } from 'lucide-react';
+import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown, X, History as HistoryIcon } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Liability {
@@ -947,7 +947,7 @@ export default function Liabilities() {
 
                                     {/* Transaction History */}
                                     <h4 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                        <History className="w-4 h-4 text-zinc-500" />
+                                        <HistoryIcon className="w-4 h-4 text-zinc-500" />
                                         Transaction History
                                     </h4>
                                     <div className="space-y-2">
