@@ -45,7 +45,6 @@ export default function Liabilities() {
     const [showRepayModal, setShowRepayModal] = useState(false);
     const [repayId, setRepayId] = useState<string | null>(null);
     const [repayAmount, setRepayAmount] = useState('');
-    const [resetDate, setResetDate] = useState(true);
 
     // Celebration State
     const [showCelebration, setShowCelebration] = useState(false);
@@ -240,7 +239,6 @@ export default function Liabilities() {
         if (e) e.stopPropagation();
         setRepayId(id);
         setRepayAmount('');
-        setResetDate(true);
         setShowRepayModal(true);
     };
 
@@ -252,12 +250,42 @@ export default function Liabilities() {
         const item = liabilities.find(l => l.id === repayId);
         if (!item) return;
 
-        const newPrincipal = Math.max(0, item.principal_amount - amount);
-        const updates: any = { principal_amount: newPrincipal };
+        const accruedInterest = item.accrued_interest || 0;
+        let newPrincipal = item.principal_amount;
+        let newStartDate = new Date().toISOString().split('T')[0];
 
-        if (resetDate) {
-            updates.start_date = new Date().toISOString().split('T')[0];
+        // Interest First Logic
+        if (amount >= accruedInterest) {
+            // Payment covers all interest + some principal
+            const principalPayment = amount - accruedInterest;
+            newPrincipal = Math.max(0, item.principal_amount - principalPayment);
+            // newStartDate stays Today (Reset)
+        } else {
+            // Payment covers only part of interest
+            // Principal remains same. We shift start_date backwards to represent remaining interest.
+            const remainingInterest = accruedInterest - amount;
+
+            // Calculate Daily Rate to determine "Days Required" for remaining interest
+            let dailyRate = 0;
+            if (item.rate_interval === 'ANNUALLY') dailyRate = item.interest_rate / 365.0;
+            else if (item.rate_interval === 'MONTHLY') dailyRate = item.interest_rate / 30.0;
+            else dailyRate = item.interest_rate;
+
+            if (dailyRate > 0 && item.principal_amount > 0) {
+                const daysForRemainingInterest = remainingInterest / (item.principal_amount * dailyRate);
+                const pastDate = new Date();
+                pastDate.setDate(pastDate.getDate() - daysForRemainingInterest);
+                newStartDate = pastDate.toISOString().split('T')[0];
+            } else {
+                // Fallback if rate is 0 (shouldn't happen with accrued interest > 0)
+                newStartDate = item.start_date;
+            }
         }
+
+        const updates = {
+            principal_amount: newPrincipal,
+            start_date: newStartDate
+        };
 
         // Optimistic
         setLiabilities(prev => prev.map(l => l.id === repayId ? { ...l, ...updates } : l));
@@ -656,12 +684,12 @@ export default function Liabilities() {
             {showRepayModal && (
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRepayModal(false)}>
                     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-bold text-white mb-4">Make a Partial Payment</h3>
-                        <p className="text-zinc-400 text-xs mb-4">This will deduct from the principal. We recommend keeping the date reset checked to recalculate interest on the new lower balance from today.</p>
+                        <h3 className="text-lg font-bold text-white mb-4">Make a Repayment</h3>
+                        <p className="text-zinc-400 text-xs mb-4">Interest is deducted first, then principal.</p>
 
                         <div className="space-y-4">
                             <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Repayment Amount (Principal)</label>
+                                <label className="text-xs text-zinc-400 block mb-1">Repayment Amount</label>
                                 <input
                                     autoFocus
                                     type="number"
@@ -672,24 +700,27 @@ export default function Liabilities() {
                                 />
                             </div>
 
-                            <div className="flex items-center gap-3 bg-zinc-800/50 p-3 rounded-lg border border-zinc-800">
-                                <input
-                                    type="checkbox"
-                                    id="resetDate"
-                                    checked={resetDate}
-                                    onChange={e => setResetDate(e.target.checked)}
-                                    className="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-emerald-500"
-                                />
-                                <label htmlFor="resetDate" className="text-sm text-zinc-300">
-                                    <div>Reset Start Date to Today?</div>
-                                    <div className="text-[10px] text-zinc-500">Recommended for accurate interest calculation on new balance.</div>
-                                </label>
-                            </div>
+                            {/* Payment Breakdown Preview */}
+                            {repayAmount && !isNaN(parseFloat(repayAmount)) && liabilities.find(l => l.id === repayId) && (
+                                <div className="bg-zinc-800/50 p-3 rounded-lg border border-zinc-800 text-sm">
+                                    <div className="text-zinc-400 mb-2 text-xs">Payment Breakdown:</div>
+                                    <div className="flex justify-between mb-1">
+                                        <span className="text-zinc-300">To Interest</span>
+                                        <span className="text-white font-mono">{formatCurrency(Math.min(parseFloat(repayAmount), liabilities.find(l => l.id === repayId)!.accrued_interest || 0))}</span>
+                                    </div>
+                                    <div className="flex justify-between border-t border-zinc-700 pt-1">
+                                        <span className="text-zinc-300">To Principal</span>
+                                        <span className="text-emerald-400 font-bold font-mono">
+                                            {formatCurrency(Math.max(0, parseFloat(repayAmount) - (liabilities.find(l => l.id === repayId)!.accrued_interest || 0)))}
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex gap-3 mt-6">
                             <button onClick={() => setShowRepayModal(false)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-white">Cancel</button>
-                            <button onClick={confirmRepayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold">Confirm Repayment</button>
+                            <button onClick={confirmRepayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold">Confirm</button>
                         </div>
                     </div>
                 </div>
