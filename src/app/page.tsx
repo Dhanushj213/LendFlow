@@ -61,6 +61,7 @@ interface Reminder {
   is_paid: boolean;
   is_variable_amount?: boolean;
   reminder_days_before?: number;
+  end_date?: string;
 }
 
 interface Sip {

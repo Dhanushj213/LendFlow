@@ -16,7 +16,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
         amount: '',
         frequency: 'MONTHLY',
         next_due_date: new Date().toISOString().split('T')[0],
-        reminder_days_before: '1'
+        reminder_days_before: '1',
+        end_date: ''
     });
 
     useEffect(() => {
@@ -26,7 +27,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 amount: initialData.amount.toString(),
                 frequency: initialData.frequency,
                 next_due_date: initialData.next_due_date,
-                reminder_days_before: initialData.reminder_days_before?.toString() || '1'
+                reminder_days_before: initialData.reminder_days_before?.toString() || '1',
+                end_date: initialData.end_date || ''
             });
         } else {
             setForm({
@@ -34,7 +36,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 amount: '',
                 frequency: 'MONTHLY',
                 next_due_date: new Date().toISOString().split('T')[0],
-                reminder_days_before: '1'
+                reminder_days_before: '1',
+                end_date: ''
             });
         }
     }, [initialData, isOpen]);
@@ -56,7 +59,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
                 is_paid: false,
-                reminder_days_before: parseInt(form.reminder_days_before) || 1
+                reminder_days_before: parseInt(form.reminder_days_before) || 1,
+                end_date: form.end_date || null
             };
 
             let error;
@@ -81,7 +85,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 amount: '',
                 frequency: 'MONTHLY',
                 next_due_date: new Date().toISOString().split('T')[0],
-                reminder_days_before: '1'
+                reminder_days_before: '1',
+                end_date: ''
             });
         } catch (e) {
             console.error(e);
@@ -140,14 +145,25 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                         </div>
                     </div>
 
-                    <div>
-                        <label className="text-xs text-zinc-400 block mb-1">Due Date <span className="text-red-500">*</span></label>
-                        <input
-                            type="date"
-                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                            value={form.next_due_date}
-                            onChange={e => setForm({ ...form, next_due_date: e.target.value })}
-                        />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Due Date <span className="text-red-500">*</span></label>
+                            <input
+                                type="date"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.next_due_date}
+                                onChange={e => setForm({ ...form, next_due_date: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">End Date (Optional)</label>
+                            <input
+                                type="date"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.end_date}
+                                onChange={e => setForm({ ...form, end_date: e.target.value })}
+                            />
+                        </div>
                     </div>
 
                     <div>

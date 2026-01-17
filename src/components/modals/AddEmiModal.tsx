@@ -184,7 +184,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="text-xs text-zinc-400 block mb-1">Loan Amount <span className="text-red-500">*</span></label>
                             <input
@@ -195,121 +195,120 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                                 onChange={e => setForm({ ...form, amount: e.target.value })}
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Start Date <span className="text-red-500">*</span></label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                    value={form.start_date}
-                                    onChange={e => {
-                                        // If End Date exists, recalc tenure
-                                        const start = new Date(e.target.value);
-                                        if (form.end_date) {
-                                            const end = new Date(form.end_date);
-                                            const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-                                            if (diffMonths > 0) setForm(prev => ({ ...prev, start_date: e.target.value, tenure_months: diffMonths.toString() }));
-                                            else setForm(prev => ({ ...prev, start_date: e.target.value }));
-                                        } else {
-                                            setForm(prev => ({ ...prev, start_date: e.target.value }));
-                                        }
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">End Date (Optional)</label>
-                                <input
-                                    type="date"
-                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                    value={form.end_date}
-                                    onChange={e => {
-                                        // Auto calc tenure based on start date
-                                        const end = new Date(e.target.value);
-                                        const start = new Date(form.start_date);
-                                        const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-                                        if (diffMonths > 0) {
-                                            setForm(prev => ({ ...prev, end_date: e.target.value, tenure_months: diffMonths.toString() }));
-                                        } else {
-                                            setForm(prev => ({ ...prev, end_date: e.target.value }));
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
-                                <input
-                                    type="number"
-                                    placeholder="8.5"
-                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                    value={form.interest_rate}
-                                    onChange={e => setForm({ ...form, interest_rate: e.target.value })}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs text-zinc-400 block mb-1">Tenure (Months)</label>
-                                <input
-                                    type="number"
-                                    placeholder="120"
-                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                    value={form.tenure_months}
-                                    onChange={e => setForm({ ...form, tenure_months: e.target.value })}
-                                />
-                            </div>
-                        </div>
-
                         <div>
-                            <label className="text-xs text-zinc-400 block mb-1">Remind me before (Days)</label>
+                            <label className="text-xs text-zinc-400 block mb-1">Start Date <span className="text-red-500">*</span></label>
                             <input
-                                type="number"
-                                placeholder="1"
-                                min="0"
+                                type="date"
                                 className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
-                                value={form.reminder_days_before}
-                                onChange={e => setForm({ ...form, reminder_days_before: e.target.value })}
+                                value={form.start_date}
+                                onChange={e => {
+                                    // If End Date exists, recalc tenure
+                                    const start = new Date(e.target.value);
+                                    if (form.end_date) {
+                                        const end = new Date(form.end_date);
+                                        const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+                                        if (diffMonths > 0) setForm(prev => ({ ...prev, start_date: e.target.value, tenure_months: diffMonths.toString() }));
+                                        else setForm(prev => ({ ...prev, start_date: e.target.value }));
+                                    } else {
+                                        setForm(prev => ({ ...prev, start_date: e.target.value }));
+                                    }
+                                }}
                             />
                         </div>
-
-                        {/* Calculated EMI Display */}
-                        <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-800">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs text-zinc-400">Monthly EMI</span>
-                                {calculatedEmi && (
-                                    <span className="text-xs text-emerald-500 font-medium px-2 py-0.5 bg-emerald-500/10 rounded">
-                                        Auto-Calculated
-                                    </span>
-                                )}
-                            </div>
-                            {calculatedEmi ? (
-                                <div className="text-2xl font-bold text-white font-mono">
-                                    ₹{calculatedEmi.toLocaleString()}
-                                </div>
-                            ) : (
-                                <input
-                                    type="number"
-                                    placeholder="Enter Manual EMI Amount"
-                                    className="w-full bg-transparent border-b border-zinc-700 p-1 text-xl text-white focus:border-emerald-500 outline-none font-mono"
-                                    value={form.manual_emi}
-                                    onChange={e => setForm({ ...form, manual_emi: e.target.value })}
-                                />
-                            )}
-                            <p className="text-[10px] text-zinc-500 mt-2">
-                                {calculatedEmi ? "This amount is calculated based on Principal, Rate & Tenure." : "Enter manually if you don't know the exact rate."}
-                            </p>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">End Date (Optional)</label>
+                            <input
+                                type="date"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.end_date}
+                                onChange={e => {
+                                    // Auto calc tenure based on start date
+                                    const end = new Date(e.target.value);
+                                    const start = new Date(form.start_date);
+                                    const diffMonths = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+                                    if (diffMonths > 0) {
+                                        setForm(prev => ({ ...prev, end_date: e.target.value, tenure_months: diffMonths.toString() }));
+                                    } else {
+                                        setForm(prev => ({ ...prev, end_date: e.target.value }));
+                                    }
+                                }}
+                            />
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleSubmit}
-                        disabled={loading}
-                        className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
-                    >
-                        {loading ? 'Saving...' : (initialData ? 'Update EMI' : 'Add EMI')}
-                    </button>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Interest Rate (%)</label>
+                            <input
+                                type="number"
+                                placeholder="8.5"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.interest_rate}
+                                onChange={e => setForm({ ...form, interest_rate: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Tenure (Months)</label>
+                            <input
+                                type="number"
+                                placeholder="120"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.tenure_months}
+                                onChange={e => setForm({ ...form, tenure_months: e.target.value })}
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Remind me before (Days)</label>
+                        <input
+                            type="number"
+                            placeholder="1"
+                            min="0"
+                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                            value={form.reminder_days_before}
+                            onChange={e => setForm({ ...form, reminder_days_before: e.target.value })}
+                        />
+                    </div>
+
+                    {/* Calculated EMI Display */}
+                    <div className="bg-zinc-800/50 p-4 rounded-xl border border-zinc-800">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-xs text-zinc-400">Monthly EMI</span>
+                            {calculatedEmi && (
+                                <span className="text-xs text-emerald-500 font-medium px-2 py-0.5 bg-emerald-500/10 rounded">
+                                    Auto-Calculated
+                                </span>
+                            )}
+                        </div>
+                        {calculatedEmi ? (
+                            <div className="text-2xl font-bold text-white font-mono">
+                                ₹{calculatedEmi.toLocaleString()}
+                            </div>
+                        ) : (
+                            <input
+                                type="number"
+                                placeholder="Enter Manual EMI Amount"
+                                className="w-full bg-transparent border-b border-zinc-700 p-1 text-xl text-white focus:border-emerald-500 outline-none font-mono"
+                                value={form.manual_emi}
+                                onChange={e => setForm({ ...form, manual_emi: e.target.value })}
+                            />
+                        )}
+                        <p className="text-[10px] text-zinc-500 mt-2">
+                            {calculatedEmi ? "This amount is calculated based on Principal, Rate & Tenure." : "Enter manually if you don't know the exact rate."}
+                        </p>
+                    </div>
                 </div>
+
+                <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
+                >
+                    {loading ? 'Saving...' : (initialData ? 'Update EMI' : 'Add EMI')}
+                </button>
             </div>
         </div>
+
     );
 }
