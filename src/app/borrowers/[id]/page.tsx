@@ -55,8 +55,9 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
                 if (loansError) throw loansError;
                 setLoans(loansData || []);
 
-            } catch (e) {
+            } catch (e: any) {
                 console.error(e);
+                setErrorMsg(e.message || JSON.stringify(e));
                 // router.push('/'); // Redirect on error for now? Or show error state
             } finally {
                 setLoading(false);
