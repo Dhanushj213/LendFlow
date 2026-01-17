@@ -59,6 +59,7 @@ export default function Dashboard() {
         .from('loans')
         .select(`
           *,
+          borrower_id,
           borrower:borrowers(name),
           transactions(*)
         `)
@@ -89,6 +90,7 @@ export default function Dashboard() {
           .from('loans')
           .select(`
             *, 
+            borrower_id,
             borrower:borrowers(name),
             transactions(*)
           `)
@@ -443,9 +445,13 @@ export default function Dashboard() {
                       <div className="flex justify-between items-center">
                         <div>
                           <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
-                            <Link href={`/borrowers/${loan.borrower_id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
-                              {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
-                            </Link>
+                            {loan.borrower_id ? (
+                              <Link href={`/borrowers/${loan.borrower_id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                                {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
+                              </Link>
+                            ) : (
+                              <span className="text-zinc-300">{(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}</span>
+                            )}
                           </h3>
                           <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">
