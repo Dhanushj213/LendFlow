@@ -79,7 +79,7 @@ export default function LoanDetail() {
             setEditForm({
                 name: loanData.title || loanData.borrower.name,
                 principal_amount: loanData.principal_amount,
-                interest_rate: (loanData.interest_rate * (loanData.rate_interval === 'ANNUALLY' || loanData.rate_interval === 'DAILY' ? 100 : 1)), // Convert back to %
+                interest_rate: loanData.interest_rate * 100, // Convert decimal (0.05) to % (5.0) for all types
                 rate_interval: loanData.rate_interval,
                 start_date: loanData.start_date,
                 interest_type: loanData.interest_type

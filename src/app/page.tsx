@@ -459,7 +459,7 @@ export default function Dashboard() {
                           </h3>
                           <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">
-                              {(loan.interest_rate * (loan.rate_interval === 'ANNUALLY' || loan.rate_interval === 'DAILY' ? 100 : 1)).toFixed(2)}% {loan.rate_interval}
+                              {(loan.interest_rate * 100).toFixed(2)}% {loan.rate_interval}
                             </span>
                           </div>
                         </div>
