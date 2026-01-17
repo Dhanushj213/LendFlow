@@ -28,3 +28,6 @@ create policy "Users can insert own borrowings"
 create policy "Users can update own borrowings"
   on personal_borrowings for update
   using (auth.uid() = user_id);
+
+-- Add title column to loans table for Merge Feature
+alter table loans add column if not exists title text;

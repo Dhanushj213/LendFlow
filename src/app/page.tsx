@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -34,6 +34,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
   const [viewMode, setViewMode] = useState<'loans' | 'borrowers'>('loans');
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
+  const [mergeName, setMergeName] = useState('');
   const router = useRouter();
   const supabase = createClient();
 
@@ -144,6 +147,59 @@ export default function Dashboard() {
     return sum + l.principal_amount + interest;
   }, 0);
 
+  const handleMerge = async () => {
+    if (selectedForMerge.length < 2 || !mergeName.trim()) return;
+
+    try {
+      setLoading(true);
+
+      // 1. Create New Borrower
+      const { data: newBorrower, error: createError } = await supabase
+        .from('borrowers')
+        .insert({ name: mergeName, user_id: (await supabase.auth.getUser()).data.user?.id })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // 2. Update Loans
+      // For each selected borrower, get their loans
+      const loansToUpdate = loans.filter(l => selectedForMerge.includes(l.borrower_id));
+
+      for (const loan of loansToUpdate) {
+        const { error: updateError } = await supabase
+          .from('loans')
+          .update({
+            borrower_id: newBorrower.id,
+            title: loan.borrower.name // Preserve old name as title
+          })
+          .eq('id', loan.id);
+
+        if (updateError) throw updateError;
+      }
+
+      // 3. Delete Old Borrowers (Optional, but cleaner)
+      for (const oldId of selectedForMerge) {
+        await supabase.from('borrowers').delete().eq('id', oldId);
+      }
+
+      // Reset
+      setSelectedForMerge([]);
+      setMergeName('');
+      setShowMergeModal(false);
+
+      // Refresh
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) fetchLoans(user.id);
+
+    } catch (e) {
+      console.error(e);
+      alert('Error merging borrowers');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const groupedBorrowers = Object.values(loans.reduce((acc, loan) => {
     if (!acc[loan.borrower_id]) {
       acc[loan.borrower_id] = {
@@ -209,6 +265,14 @@ export default function Dashboard() {
             >
               <Users className="w-3 h-3" /> Group by Borrower
             </button>
+            {viewMode === 'borrowers' && (
+              <button
+                onClick={() => setShowMergeModal(true)}
+                className="ml-2 px-3 py-1.5 rounded-md text-xs font-medium text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 transition-all flex items-center gap-2"
+              >
+                <Merge className="w-3 h-3" /> Merge
+              </button>
+            )}
           </div>
 
           <div className="flex gap-4">
@@ -458,11 +522,78 @@ export default function Dashboard() {
                 ))
               )
             )}
-
-            {/* Mobile View Toggle (Floating or bottom) can go here if needed, but header toggle works for now */}
           </div>
         </section>
 
+        {/* Merge Modal */}
+        {showMergeModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <Merge className="w-5 h-5 text-emerald-500" />
+                Merge Borrowers
+              </h3>
+
+              <div className="flex-1 overflow-y-auto min-h-0 mb-4 space-y-2">
+                <p className="text-sm text-zinc-500 mb-2">Select borrowers to merge (Minimum 2):</p>
+                {groupedBorrowers.map((b: any) => (
+                  <div
+                    key={b.id}
+                    onClick={() => {
+                      if (selectedForMerge.includes(b.id)) {
+                        setSelectedForMerge(prev => prev.filter(id => id !== b.id));
+                      } else {
+                        setSelectedForMerge(prev => [...prev, b.id]);
+                      }
+                    }}
+                    className={`p-3 rounded-xl border cursor-pointer transition-all flex justify-between items-center ${selectedForMerge.includes(b.id)
+                      ? 'bg-emerald-500/10 border-emerald-500/50 text-white'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                  >
+                    <span>{b.name}</span>
+                    {selectedForMerge.includes(b.id) && <Check className="w-4 h-4 text-emerald-500" />}
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-zinc-500 block mb-1">New Group Name</label>
+                  <input
+                    type="text"
+                    value={mergeName}
+                    onChange={e => setMergeName(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                    placeholder="e.g. Family Group"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowMergeModal(false);
+                      setSelectedForMerge([]);
+                      setMergeName('');
+                    }}
+                    className="flex-1 py-3 rounded-xl font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleMerge}
+                    disabled={selectedForMerge.length < 2 || !mergeName.trim()}
+                    className="flex-1 py-3 rounded-xl font-medium bg-emerald-600 text-white hover:bg-emerald-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Confirm Merge
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile View Toggle (Floating or bottom) can go here if needed, but header toggle works for now */}
       </div>
     </main>
   );

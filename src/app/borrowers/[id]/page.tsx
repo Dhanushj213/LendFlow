@@ -154,6 +154,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
                                             </div>
                                             <div>
                                                 <div className="text-white font-medium">
+                                                    {(loan as any).title ? <div className="text-xs text-zinc-500 font-normal mb-0.5">{(loan as any).title}</div> : null}
                                                     {formatCurrency(loan.principal_amount)} Loan
                                                 </div>
                                                 <div className="text-sm text-zinc-500">
