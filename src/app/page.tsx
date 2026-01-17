@@ -148,9 +148,11 @@ export default function Dashboard() {
       today.setHours(0, 0, 0, 0);
 
       allItems.forEach((item: any) => {
-        if (item.status === 'CLOSED' || item.is_paid) return;
+        if (item.status === 'CLOSED' || item.is_paid || !item.next_due_date) return;
 
         const due = new Date(item.next_due_date);
+        if (isNaN(due.getTime())) return; // invalid date check
+
         due.setHours(0, 0, 0, 0);
 
         const diffTime = due.getTime() - today.getTime();
@@ -159,13 +161,16 @@ export default function Dashboard() {
         const remindDays = item.reminder_days_before || 1; // Default 1 day
 
         if (daysUntilDue <= remindDays && daysUntilDue >= 0) {
-          // Check if we already notified today (simple local storage check to avoid spam?)
-          // For now, just trigger. Browser often debounce specific tags.
-          new Notification(`Payment Due Soon: ${item.name || item.title}`, {
-            body: `${daysUntilDue === 0 ? 'Due Today' : `Due in ${daysUntilDue} days`}: ${formatCurrency(item.amount || item.premium_amount)}`,
-            icon: '/Logo.png',
-            tag: `payment-${item.id}-${new Date().toISOString().split('T')[0]}` // One per day per item
-          });
+          try {
+            // Wrap in try-catch for mobile safety
+            new Notification(`Payment Due Soon: ${item.name || item.title}`, {
+              body: `${daysUntilDue === 0 ? 'Due Today' : `Due in ${daysUntilDue} days`}: ${formatCurrency(item.amount || item.premium_amount)}`,
+              icon: '/Logo.png',
+              tag: `payment-${item.id || 'unknown'}-${new Date().toISOString().split('T')[0]}`
+            });
+          } catch (e) {
+            console.warn('Notification failed:', e);
+          }
         }
       });
     };
@@ -261,7 +266,8 @@ export default function Dashboard() {
     .filter(l => l.status === 'ACTIVE')
     .reduce((sum, l) => sum + l.accrued_interest, 0);
 
-  const formatCurrency = (val: number) => {
+  const formatCurrency = (val: number | undefined | null) => {
+    if (val === undefined || val === null) return '₹0';
     if (hideAmounts) return '••••••';
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
   };
@@ -442,7 +448,7 @@ export default function Dashboard() {
 
       // 5. Vibration
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
-        navigator.vibrate(50);
+        navigator.vibrate(200); // Success haptic
       }
 
     } catch (e) {
