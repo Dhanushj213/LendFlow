@@ -695,21 +695,26 @@ export default function Liabilities() {
                             <div key={idx} className="glass-panel p-0 rounded-xl hover:border-red-500/30 transition-colors overflow-hidden">
                                 {/* Group Header */}
                                 <div className="p-6 border-b border-zinc-800/50 bg-zinc-900/20">
-                                    <div className="flex justify-between items-start">
+                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-zinc-800">
                                         <div>
-                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                                                 {g.name}
-                                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
-                                                    {g.items.length} Component{g.items.length !== 1 ? 's' : ''}
-                                                </span>
+                                                <span className="text-xs text-zinc-500 font-normal">({g.items.length} items)</span>
                                             </h3>
-                                            <div className="text-xs text-zinc-500 mt-1">
-                                                Total Principal: <span className="text-zinc-300 font-mono">{formatCurrency(g.principal)}</span>
+                                            <div className="flex items-center gap-3 text-sm text-zinc-400 mt-1">
+                                                <span>Principal: {formatCurrency(g.principal)}</span>
+                                                <span className="w-1 h-1 rounded-full bg-zinc-700"></span>
+                                                <span className="text-red-400">Interest: {formatCurrency(g.interest)}</span>
                                             </div>
                                         </div>
-                                        <div className="text-right">
-                                            <div className="text-2xl font-bold text-white font-mono">{formatCurrency(g.principal + g.interest)}</div>
-                                            <div className="text-xs text-zinc-500">Total Due</div>
+                                        <div className="hidden sm:block text-right">
+                                            <div className="text-2xl font-bold text-white">{formatCurrency(g.principal + g.interest)}</div>
+                                            <div className="text-xs text-zinc-500">Total Liability</div>
+                                        </div>
+                                        {/* Mobile Total visible only on small screens */}
+                                        <div className="sm:hidden w-full bg-zinc-900/50 p-3 rounded-lg flex justify-between items-center">
+                                            <span className="text-sm text-zinc-400">Total Liability</span>
+                                            <span className="text-lg font-bold text-white">{formatCurrency(g.principal + g.interest)}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -722,67 +727,88 @@ export default function Liabilities() {
                                             onClick={() => handleCardClick(l.id)}
                                             className={`p-4 hover:bg-zinc-900/30 transition-colors relative group cursor-pointer ${selectedIds.includes(l.id) ? 'bg-emerald-900/10' : ''}`}
                                         >
-                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                                {/* Left: Info */}
-                                                <div className="flex items-start gap-3">
-                                                    {/* Selection Checkbox (Nested) */}
-                                                    {(selectedIds.length > 0) && (
-                                                        <div className="pt-1">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={selectedIds.includes(l.id)}
-                                                                onChange={() => toggleSelection(l.id)}
-                                                                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
-                                                            />
+                                            <div className="flex items-start gap-3">
+                                                {/* Selection Checkbox (Nested) */}
+                                                {(selectedIds.length > 0) && (
+                                                    <div className="pt-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={selectedIds.includes(l.id)}
+                                                            onChange={() => toggleSelection(l.id)}
+                                                            className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
+                                                    {/* Left: Info */}
+                                                    <div className="flex-1 w-full sm:w-auto">
+                                                        <div className="flex justify-between sm:justify-start items-center gap-3 mb-1">
+                                                            <span className="text-base font-medium text-white truncate max-w-[200px]">{l.title || 'Loan'}</span>
+                                                            <div className="flex gap-2">
+                                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap">
+                                                                    {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval.charAt(0)}
+                                                                </span>
+                                                                {l.status === 'CLOSED' && <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-400 border border-emerald-900/50 flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Paid</span>}
+                                                            </div>
                                                         </div>
-                                                    )}
+                                                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-x-4 gap-y-1 text-sm text-zinc-400 w-full">
+                                                            <div className="flex flex-col sm:block">
+                                                                <span className="text-[10px] uppercase text-zinc-600 sm:hidden">Principal</span>
+                                                                <span>{formatCurrency(l.principal_amount)}</span>
+                                                            </div>
+                                                            <span className="hidden sm:block w-1 h-1 rounded-full bg-zinc-700"></span>
+                                                            <div className="flex flex-col sm:block">
+                                                                <span className="text-[10px] uppercase text-zinc-600 sm:hidden">Interest</span>
+                                                                <span className="text-red-400">{formatCurrency(l.accrued_interest || 0)}</span>
+                                                            </div>
+                                                            <span className="hidden sm:block w-1 h-1 rounded-full bg-zinc-700"></span>
+                                                            <div className="flex flex-col sm:block col-span-2">
+                                                                <span className="text-[10px] uppercase text-zinc-600 sm:hidden">Start Date</span>
+                                                                <span>{new Date(l.start_date).toLocaleDateString()}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium text-white">{l.title || 'Principal Loan'}</span>
-                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
-                                                                {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
-                                                            </span>
-                                                        </div>
-                                                        <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
-                                                            <span>Principal: {formatCurrency(l.principal_amount)}</span>
-                                                            <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                                                            <span>Interest: <span className="text-red-400">{formatCurrency(l.accrued_interest || 0)}</span></span>
-                                                            <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                                                            <span>Since {new Date(l.start_date).toLocaleDateString()}</span>
+                                                    {/* Actions */}
+                                                    <div className="flex sm:flex-col lg:flex-row items-stretch sm:items-end lg:items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0" onClick={e => e.stopPropagation()}>
+                                                        {l.status === 'ACTIVE' && (
+                                                            <button
+                                                                onClick={(e) => { e.stopPropagation(); setRepayId(l.id); setShowRepayModal(true); }}
+                                                                className="flex-1 sm:flex-none px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-xs font-medium rounded border border-zinc-700 transition-colors flex items-center justify-center gap-1.5"
+                                                            >
+                                                                <TrendingDown className="w-3 h-3" /> Repay
+                                                            </button>
+                                                        )}
+
+                                                        <div className="flex gap-2 flex-1 sm:flex-none">
+                                                            <button
+                                                                onClick={(e) => handleToggleStatus(l.id, l.status as any, e)}
+                                                                className={`flex-1 sm:flex-none px-3 py-1.5 rounded text-xs font-medium border transition-colors flex items-center justify-center gap-1.5 ${l.status === 'ACTIVE' ? 'bg-zinc-800 text-zinc-300 border-zinc-700 hover:bg-zinc-700' : 'bg-emerald-900/20 text-emerald-400 border-emerald-900/50 hover:bg-emerald-900/30'}`}
+                                                            >
+                                                                {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
+                                                            </button>
+
+                                                            {l.status === 'ACTIVE' && (
+                                                                <>
+                                                                    <button
+                                                                        onClick={(e) => handleEditClick(l, e)}
+                                                                        className="px-2 py-1.5 bg-zinc-900 hover:text-white text-zinc-500 rounded border border-zinc-800 transition-colors"
+                                                                    >
+                                                                        <Edit2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => handleDelete(l.id, e)}
+                                                                        className="px-2 py-1.5 bg-zinc-900 hover:text-red-400 text-zinc-500 rounded border border-zinc-800 transition-colors"
+                                                                    >
+                                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                                    </button>
+                                                                </>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Right: Actions */}
-                                                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                                                    <span className="text-sm font-bold text-zinc-300 font-mono md:hidden">
-                                                        {formatCurrency(l.total_due || 0)}
-                                                    </span>
-
-                                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {l.status === 'ACTIVE' && (
-                                                            <button
-                                                                onClick={(e) => handleRepayClick(l.id, e)}
-                                                                className="p-1.5 bg-emerald-900/20 text-emerald-500 rounded hover:bg-emerald-900/40 transition-colors text-[10px] font-medium flex items-center gap-1"
-                                                            >
-                                                                Repay
-                                                            </button>
-                                                        )}
-                                                        <button
-                                                            onClick={(e) => handleToggleStatus(l.id, l.status, e)}
-                                                            className={`p-1.5 rounded hover:bg-zinc-700 transition-colors text-[10px] font-medium flex items-center gap-1 ${l.status === 'ACTIVE' ? 'text-zinc-400' : 'text-emerald-500'}`}
-                                                            title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
-                                                        >
-                                                            {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
-                                                        </button>
-                                                        <button onClick={() => handleEditClick(l)} className="p-1.5 text-zinc-500 hover:text-white rounded hover:bg-zinc-800"><Edit2 className="w-3 h-3" /></button>
-                                                        <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-1.5 text-zinc-500 hover:text-red-500 rounded hover:bg-zinc-800"><Trash2 className="w-3 h-3" /></button>
-                                                    </div>
-
-                                                    <div className="hidden md:block text-right min-w-[100px]">
-                                                        <div className="text-sm font-bold text-zinc-300 font-mono">{formatCurrency(l.total_due || 0)}</div>
-                                                    </div>
+                                                <div className="hidden md:block text-right min-w-[100px]">
+                                                    <div className="text-sm font-bold text-zinc-300 font-mono">{formatCurrency(l.total_due || 0)}</div>
                                                 </div>
                                             </div>
                                         </div>
