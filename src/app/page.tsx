@@ -132,22 +132,25 @@ export default function Dashboard() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
 
-  const totalLiabilities = liabilities.reduce((sum, l) => {
-    // Calculate simple interest client side for summary
-    const start = new Date(l.start_date);
-    const now = new Date();
-    const splitDate = new Date().toISOString().split('T')[0]; // simple comparison if needed
-    const diffTime = Math.abs(now.getTime() - start.getTime());
-    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  const totalLiabilities = liabilities
+    .filter(l => l.status === 'ACTIVE')
+    .reduce((sum, l) => {
+      // Calculate simple interest client side for summary
+      const start = new Date(l.start_date);
+      const now = new Date();
+      // const splitDate = new Date().toISOString().split('T')[0]; 
+      const diffTime = Math.abs(now.getTime() - start.getTime());
+      const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
-    let dailyRate = 0;
-    if (l.rate_interval === 'ANNUALLY') dailyRate = (l.interest_rate / 100) / 365.0;
-    else if (l.rate_interval === 'MONTHLY') dailyRate = (l.interest_rate / 100) / 30.0;
-    else dailyRate = l.interest_rate / 100;
+      let dailyRate = 0;
+      // Rate is stored as decimal (e.g. 0.12 for 12%), so we use it directly
+      if (l.rate_interval === 'ANNUALLY') dailyRate = l.interest_rate / 365.0;
+      else if (l.rate_interval === 'MONTHLY') dailyRate = l.interest_rate / 30.0;
+      else dailyRate = l.interest_rate;
 
-    const interest = l.principal_amount * dailyRate * days;
-    return sum + l.principal_amount + interest;
-  }, 0);
+      const interest = l.principal_amount * dailyRate * days;
+      return sum + l.principal_amount + interest;
+    }, 0);
 
   const handleMerge = async () => {
     if (selectedForMerge.length < 2 || !mergeName.trim()) return;
