@@ -489,9 +489,32 @@ export default function Dashboard() {
       }
       else if (paymentCategory === 'SIP') {
         table = 'mutual_fund_sips';
-        // SIP Logic: +1 Month
-        nextDue.setMonth(nextDue.getMonth() + 1);
-        updates.next_due_date = nextDue.toISOString().split('T')[0];
+
+        // Strict SIP Date Logic: Force Next Due Date to be the 'sip_date' of the next month
+        // This avoids timezone shifts and ensures if today is 17th and due is 17th, it moves to Feb 17th.
+        const sipDay = paymentItem.sip_date;
+        const currentMonth = nextDue.getMonth();
+        const currentYear = nextDue.getFullYear();
+
+        // Move to next month
+        let targetMonth = currentMonth + 1;
+        let targetYear = currentYear;
+
+        if (targetMonth > 11) {
+          targetMonth = 0;
+          targetYear++;
+        }
+
+        // Handle edge cases like Feb 30 -> Feb 28
+        const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+        const actualDay = Math.min(sipDay, daysInTargetMonth);
+
+        // Construct Local Date String YYYY-MM-DD manually to avoid UTC conversion shifts
+        const yyyy = targetYear;
+        const mm = String(targetMonth + 1).padStart(2, '0');
+        const dd = String(actualDay).padStart(2, '0');
+
+        updates.next_due_date = `${yyyy}-${mm}-${dd}`;
       }
 
       // 3. Update Item
