@@ -398,8 +398,10 @@ export default function Dashboard() {
   };
 
   // Payment Logic
-  const initiatePayment = (item: any, category: 'EMI' | 'INSURANCE' | 'REMINDER') => {
-    setPaymentItem(item);
+  const initiatePayment = (item: any, category: 'EMI' | 'INSURANCE' | 'REMINDER' | 'SIP') => {
+    // Derive title immediately to ensure it's captured
+    const derivedTitle = item.name || item.title || item.fund_name || (category === 'SIP' ? item.fund_name : 'Unknown Payment');
+    setPaymentItem({ ...item, _derivedTitle: derivedTitle });
     setPaymentCategory(category);
     setShowPaymentModal(true);
   };
@@ -419,7 +421,7 @@ export default function Dashboard() {
         payment_mode: details.payment_mode,
         category: paymentCategory,
         reference_id: paymentItem.id,
-        title: paymentItem.name || paymentItem.title || paymentItem.fund_name || (paymentCategory === 'SIP' ? paymentItem.fund_name : 'Unknown Payment')
+        title: paymentItem._derivedTitle || paymentItem.name || paymentItem.title || 'Unknown Payment'
       });
       if (historyError) throw historyError;
 
@@ -709,13 +711,23 @@ export default function Dashboard() {
 
           {/* Mobile Actions */}
           <div className="flex md:hidden items-center gap-2">
-            <Link
-              href="/liabilities"
-              className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
-              title="My Borrowings"
-            >
-              <Wallet className="w-5 h-5 text-red-400" />
-            </Link>
+            {viewMode === 'emis' ? (
+              <Link
+                href="/history"
+                className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
+                title="Payment History"
+              >
+                <History className="w-5 h-5 text-emerald-500" />
+              </Link>
+            ) : (
+              <Link
+                href="/liabilities"
+                className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
+                title="My Borrowings"
+              >
+                <Wallet className="w-5 h-5 text-red-400" />
+              </Link>
+            )}
             <Link
               href="/create"
               className="flex items-center justify-center w-8 h-8 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg shadow-lg hover:shadow-emerald-900/20"
