@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -25,6 +25,7 @@ interface Loan {
   last_accrual_date: string;
   transactions: Transaction[];
   principal_amount: number; // Added for closed loans display
+  borrower_id: string;
 }
 
 export default function Dashboard() {
@@ -149,6 +150,13 @@ export default function Dashboard() {
               Sign Out
             </button>
             <Link
+              href="/calculator"
+              className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
+              title="Interest Calculator"
+            >
+              <Calculator className="w-5 h-5" />
+            </Link>
+            <Link
               href="/create"
               className="group flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg hover:shadow-emerald-900/20"
             >
@@ -241,8 +249,10 @@ export default function Dashboard() {
                     <div className="glass-panel p-5 rounded-xl hover:border-emerald-500/50 transition-colors">
                       <div className="flex justify-between items-center">
                         <div>
-                          <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">
-                            {loan.borrower?.name || 'Unknown Borrower'}
+                          <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
+                            <Link href={`/borrowers/${loan.borrower_id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
+                              {loan.borrower?.name || 'Unknown Borrower'}
+                            </Link>
                           </h3>
                           <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">

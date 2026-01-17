@@ -387,7 +387,7 @@ export default function LoanDetail() {
                 <div className="flex justify-between items-start mb-8">
                     <div>
                         <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-3xl font-bold text-white">{loan.borrower?.name}</h1>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white">{loan.borrower?.name}</h1>
                             <button onClick={() => setIsEditing(true)} className="p-2 hover:bg-zinc-800 rounded-full text-zinc-500 hover:text-white transition-colors">
                                 <Pencil className="w-4 h-4" />
                             </button>
@@ -420,7 +420,7 @@ export default function LoanDetail() {
                         <div className="col-span-2 bg-gradient-to-r from-zinc-900 to-zinc-900/50 border border-zinc-800 p-6 rounded-xl flex justify-between items-center">
                             <div>
                                 <span className="text-zinc-500 text-sm">Total Payoff Amount</span>
-                                <div className="text-3xl font-bold text-white mt-1">{formatCurrency(totalDue)}</div>
+                                <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatCurrency(totalDue)}</div>
                             </div>
                             <div className="text-right">
                                 <span className="text-zinc-500 text-sm block">Original Loan</span>
