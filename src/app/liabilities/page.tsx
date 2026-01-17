@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Wallet, TrendingUp, Calendar, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown } from 'lucide-react';
+import confetti from 'canvas-confetti';
 
 interface Liability {
     id: string;
@@ -39,6 +40,16 @@ export default function Liabilities() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [statusTab, setStatusTab] = useState<'ACTIVE' | 'CLOSED'>('ACTIVE');
+
+    // Repayment State
+    const [showRepayModal, setShowRepayModal] = useState(false);
+    const [repayId, setRepayId] = useState<string | null>(null);
+    const [repayAmount, setRepayAmount] = useState('');
+    const [resetDate, setResetDate] = useState(true);
+
+    // Celebration State
+    const [showCelebration, setShowCelebration] = useState(false);
+    const [celebratedItem, setCelebratedItem] = useState<Liability | null>(null);
 
     const [form, setForm] = useState({
         lender_name: '',
@@ -198,6 +209,19 @@ export default function Liabilities() {
         // Optimistic
         setLiabilities(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
 
+        if (newStatus === 'CLOSED') {
+            const item = liabilities.find(l => l.id === id);
+            if (item) {
+                setCelebratedItem(item);
+                setShowCelebration(true);
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            }
+        }
+
         try {
             const { error } = await supabase
                 .from('personal_borrowings')
@@ -209,6 +233,47 @@ export default function Liabilities() {
             console.error(e);
             alert('Error updating status');
             fetchLiabilities(); // Revert
+        }
+    };
+
+    const handleRepayClick = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setRepayId(id);
+        setRepayAmount('');
+        setResetDate(true);
+        setShowRepayModal(true);
+    };
+
+    const confirmRepayment = async () => {
+        if (!repayId || !repayAmount) return;
+        const amount = parseFloat(repayAmount);
+        if (isNaN(amount) || amount <= 0) return;
+
+        const item = liabilities.find(l => l.id === repayId);
+        if (!item) return;
+
+        const newPrincipal = Math.max(0, item.principal_amount - amount);
+        const updates: any = { principal_amount: newPrincipal };
+
+        if (resetDate) {
+            updates.start_date = new Date().toISOString().split('T')[0];
+        }
+
+        // Optimistic
+        setLiabilities(prev => prev.map(l => l.id === repayId ? { ...l, ...updates } : l));
+        setShowRepayModal(false);
+
+        try {
+            const { error } = await supabase
+                .from('personal_borrowings')
+                .update(updates)
+                .eq('id', repayId);
+
+            if (error) throw error;
+        } catch (e) {
+            console.error(e);
+            alert('Error processing repayment');
+            fetchLiabilities();
         }
     };
 
@@ -451,46 +516,59 @@ export default function Liabilities() {
                                         </div>
                                     ) : null}
 
-                                    <div className="flex justify-end absolute top-4 right-4 gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button
-                                            onClick={(e) => handleToggleStatus(l.id, l.status, e)}
-                                            className={`p-2 rounded-lg font-medium text-xs ${l.status === 'ACTIVE' ? 'text-emerald-500 bg-emerald-900/20 hover:bg-emerald-900/40' : 'text-zinc-500 bg-zinc-800 hover:text-white'}`}
-                                            title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
-                                        >
-                                            {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
-                                        </button>
-                                        <button onClick={() => handleEditClick(l)} className="p-2 text-zinc-600 hover:text-white bg-zinc-800 rounded-lg font-medium text-xs">Edit</button>
-                                        <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-2 text-zinc-600 hover:text-red-500 bg-zinc-800 rounded-lg font-medium text-xs"><Trash2 className="w-3 h-3" /></button>
-                                    </div>
-
-                                    <div className="pl-8"> {/* Indent for checkbox */}
-                                        <div className="flex justify-between items-start mb-4">
-                                            <div>
-                                                <h3 className="text-lg font-medium text-white">
-                                                    {(l as any).title || l.lender_name}
-                                                    {(l as any).title && (
-                                                        <span className="ml-3 px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs border border-zinc-700">
-                                                            Group: {l.lender_name}
-                                                        </span>
-                                                    )}
-                                                </h3>
-                                                <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
-                                                    <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-white">
-                                                        {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+                                        <div className="flex-1">
+                                            <h3 className="text-lg font-medium text-white flex items-center gap-2">
+                                                {(l as any).title || l.lender_name}
+                                                {(l as any).title && (
+                                                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs border border-zinc-700">
+                                                        Group: {l.lender_name}
                                                     </span>
-                                                    <span className="flex items-center gap-1 text-xs">
-                                                        <Calendar className="w-3 h-3" /> Since {new Date(l.start_date).toLocaleDateString()}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="text-right pr-12">
-                                                <div className="text-2xl font-bold text-white">{formatCurrency(l.total_due || 0)}</div>
-                                                <div className="text-xs text-zinc-500">Total Due</div>
+                                                )}
+                                            </h3>
+                                            <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
+                                                <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-white">
+                                                    {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
+                                                </span>
+                                                <span className="flex items-center gap-1 text-xs">
+                                                    <Calendar className="w-3 h-3" /> Since {new Date(l.start_date).toLocaleDateString()}
+                                                </span>
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
-                                            <div><span className="text-xs text-zinc-500 block mb-1">Principal</span><span className="text-white font-mono">{formatCurrency(l.principal_amount)}</span></div>
-                                            <div className="text-right"><span className="text-xs text-zinc-500 block mb-1">Accrued Interest ({l.days_elapsed} days)</span><span className="text-red-400 font-mono">{formatCurrency(l.accrued_interest || 0)}</span></div>
+
+                                        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                                            {l.status === 'ACTIVE' && (
+                                                <button
+                                                    onClick={(e) => handleRepayClick(l.id, e)}
+                                                    className="p-2 bg-emerald-900/20 text-emerald-500 rounded-lg hover:bg-emerald-900/40 transition-colors text-xs font-medium flex items-center gap-1"
+                                                >
+                                                    <TrendingDown className="w-3 h-3" /> Repay
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={(e) => handleToggleStatus(l.id, l.status, e)}
+                                                className={`p-2 rounded-lg font-medium text-xs flex items-center gap-1 ${l.status === 'ACTIVE' ? 'text-zinc-400 bg-zinc-800 hover:text-white hover:bg-zinc-700' : 'text-emerald-500 bg-emerald-900/20'}`}
+                                                title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
+                                            >
+                                                <CheckCircle className="w-3 h-3" /> {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
+                                            </button>
+                                            <button onClick={() => handleEditClick(l)} className="p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"><Edit2 className="w-3 h-3" /></button>
+                                            <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-2 text-zinc-400 hover:text-red-500 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"><Trash2 className="w-3 h-3" /></button>
+                                        </div>
+                                    </div>
+
+                                    <div className="pl-0 md:pl-0">
+                                        {/* Removed redundant flex header, now using the one above */}
+                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50 mt-2">
+                                            <div>
+                                                <span className="text-xs text-zinc-500 block mb-1">Principal</span>
+                                                <span className="text-white font-mono text-lg">{formatCurrency(l.principal_amount)}</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-xs text-zinc-500 block mb-1">Total Due (w/ Interest)</span>
+                                                <span className="text-red-400 font-bold font-mono text-lg">{formatCurrency(l.total_due || 0)}</span>
+                                                <div className="text-[10px] text-zinc-600 mt-0.5">Interest: {formatCurrency(l.accrued_interest || 0)}</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -571,6 +649,81 @@ export default function Liabilities() {
                             <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-white">Cancel</button>
                             <button onClick={confirmDelete} className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500">Delete</button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Repayment Modal */}
+            {showRepayModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRepayModal(false)}>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-white mb-4">Make a Partial Payment</h3>
+                        <p className="text-zinc-400 text-xs mb-4">This will deduct from the principal. We recommend keeping the date reset checked to recalculate interest on the new lower balance from today.</p>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-xs text-zinc-400 block mb-1">Repayment Amount (Principal)</label>
+                                <input
+                                    autoFocus
+                                    type="number"
+                                    className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none text-xl font-mono"
+                                    placeholder="0.00"
+                                    value={repayAmount}
+                                    onChange={e => setRepayAmount(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-3 bg-zinc-800/50 p-3 rounded-lg border border-zinc-800">
+                                <input
+                                    type="checkbox"
+                                    id="resetDate"
+                                    checked={resetDate}
+                                    onChange={e => setResetDate(e.target.checked)}
+                                    className="w-4 h-4 rounded bg-zinc-900 border-zinc-700 text-emerald-500 focus:ring-emerald-500"
+                                />
+                                <label htmlFor="resetDate" className="text-sm text-zinc-300">
+                                    <div>Reset Start Date to Today?</div>
+                                    <div className="text-[10px] text-zinc-500">Recommended for accurate interest calculation on new balance.</div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 mt-6">
+                            <button onClick={() => setShowRepayModal(false)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-white">Cancel</button>
+                            <button onClick={confirmRepayment} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 font-bold">Confirm Repayment</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Celebration Modal */}
+            {showCelebration && celebratedItem && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 text-center" onClick={() => setShowCelebration(false)}>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-3xl w-full max-w-md p-8 relative overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none" />
+
+                        <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <CheckCircle className="w-8 h-8" />
+                        </div>
+
+                        <h2 className="text-3xl font-bold text-white mb-2">Well Done!</h2>
+                        <p className="text-zinc-400 mb-6">You settled up <span className="text-white font-medium">{celebratedItem.lender_name}</span> in <span className="text-emerald-400 font-bold">{celebratedItem.days_elapsed || 0} days</span>!</p>
+
+                        <div className="bg-black/50 rounded-xl p-4 mb-6 border border-zinc-800">
+                            <div className="grid grid-cols-2 gap-4 text-left">
+                                <div>
+                                    <div className="text-xs text-zinc-500">Principal Repaid</div>
+                                    <div className="text-lg font-mono text-white">{formatCurrency(celebratedItem.principal_amount)}</div>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-zinc-500">Interest Saved</div>
+                                    <div className="text-lg font-mono text-emerald-400">Priceless!</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onClick={() => setShowCelebration(false)} className="w-full py-3 rounded-xl bg-white text-black font-bold hover:bg-zinc-200 transition-colors">
+                            Awesome!
+                        </button>
                     </div>
                 </div>
             )}
