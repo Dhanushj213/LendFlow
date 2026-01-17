@@ -163,7 +163,7 @@ export default function Dashboard() {
           // For now, just trigger. Browser often debounce specific tags.
           new Notification(`Payment Due Soon: ${item.name || item.title}`, {
             body: `${daysUntilDue === 0 ? 'Due Today' : `Due in ${daysUntilDue} days`}: ${formatCurrency(item.amount || item.premium_amount)}`,
-            icon: '/icon.png', // Placeholder
+            icon: '/Logo.png',
             tag: `payment-${item.id}-${new Date().toISOString().split('T')[0]}` // One per day per item
           });
         }
