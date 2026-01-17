@@ -28,12 +28,46 @@ interface Loan {
   borrower_id: string;
 }
 
+interface EMI {
+  id: string;
+  name: string;
+  lender: string;
+  amount: number;
+  remaining_months: number;
+  next_due_date: string;
+  status: 'ACTIVE' | 'CLOSED';
+}
+
+interface Insurance {
+  id: string;
+  name: string;
+  provider: string;
+  premium_amount: number;
+  frequency: string;
+  next_due_date: string;
+}
+
+interface Reminder {
+  id: string;
+  title: string;
+  amount: number;
+  frequency: string;
+  next_due_date: string;
+  is_paid: boolean;
+}
+
 export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
   const [liabilities, setLiabilities] = useState<any[]>([]);
+
+  // New State for EMI Feature
+  const [emis, setEmis] = useState<EMI[]>([]);
+  const [insurance, setInsurance] = useState<Insurance[]>([]);
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
-  const [viewMode, setViewMode] = useState<'loans' | 'borrowers'>('loans');
+  const [viewMode, setViewMode] = useState<'loans' | 'borrowers' | 'emis'>('loans');
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
@@ -72,6 +106,15 @@ export default function Dashboard() {
         .select('*');
 
       setLiabilities(liabilitiesData || []);
+
+      // 1.8 Fetch EMIs & Reminders
+      const { data: emisData } = await supabase.from('emis').select('*');
+      const { data: insData } = await supabase.from('insurance_policies').select('*');
+      const { data: remData } = await supabase.from('reminders').select('*');
+
+      setEmis(emisData || []);
+      setInsurance(insData || []);
+      setReminders(remData || []);
 
       if (error) throw error;
 
@@ -271,6 +314,13 @@ export default function Dashboard() {
             >
               <Users className="w-3 h-3" /> Group by Borrower
             </button>
+            <button
+              onClick={() => setViewMode('emis')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${viewMode === 'emis' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+              <Calendar className="w-3 h-3" /> EMIs & Reminders
+            </button>
             {viewMode === 'borrowers' && (
               <button
                 onClick={() => setShowMergeModal(true)}
@@ -455,7 +505,119 @@ export default function Dashboard() {
         {/* List Content */}
         <section>
           <div className="grid gap-4">
-            {viewMode === 'borrowers' ? (
+            {viewMode === 'emis' ? (
+              // EMI & REMINDERS VIEW
+              <div className="space-y-8">
+                {/* Stats for EMI Mode */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
+                    <span className="text-zinc-500 text-sm">Monthly EMIs</span>
+                    <div className="text-2xl font-bold text-white mt-1">
+                      {formatCurrency(emis.reduce((acc, e) => acc + (e.status === 'ACTIVE' ? e.amount : 0), 0))}
+                    </div>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
+                    <span className="text-zinc-500 text-sm">Insurance Premiums</span>
+                    <div className="text-2xl font-bold text-white mt-1">
+                      {formatCurrency(insurance.reduce((acc, i) => acc + i.premium_amount, 0))}
+                    </div>
+                  </div>
+                  <div className="bg-zinc-900 border border-zinc-800 p-6 rounded-xl">
+                    <span className="text-zinc-500 text-sm">Active Reminders</span>
+                    <div className="text-2xl font-bold text-white mt-1">
+                      {formatCurrency(reminders.reduce((acc, r) => acc + (r.is_paid ? 0 : r.amount), 0))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* EMIs List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Active EMIs</h3>
+                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                      + Add EMI
+                    </button>
+                  </div>
+                  <div className="grid gap-4">
+                    {emis.filter(e => e.status === 'ACTIVE').length === 0 ? (
+                      <div className="text-zinc-500 text-sm italic">No active EMIs found.</div>
+                    ) : (
+                      emis.filter(e => e.status === 'ACTIVE').map(emi => (
+                        <div key={emi.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
+                          <div>
+                            <h4 className="text-white font-medium">{emi.name}</h4>
+                            <div className="text-xs text-zinc-500">{emi.lender} • {emi.remaining_months} months left</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
+                            <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Insurance List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Insurance Policies</h3>
+                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                      + Add Policy
+                    </button>
+                  </div>
+                  <div className="grid gap-4">
+                    {insurance.length === 0 ? (
+                      <div className="text-zinc-500 text-sm italic">No insurance policies found.</div>
+                    ) : (
+                      insurance.map(pol => (
+                        <div key={pol.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
+                          <div>
+                            <h4 className="text-white font-medium">{pol.name}</h4>
+                            <div className="text-xs text-zinc-500">{pol.provider} • {pol.frequency}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
+                            <div className="text-xs text-zinc-500">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Reminders List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Other Reminders</h3>
+                    <button className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors">
+                      + Add Reminder
+                    </button>
+                  </div>
+                  <div className="grid gap-4">
+                    {reminders.length === 0 ? (
+                      <div className="text-zinc-500 text-sm italic">No active reminders found.</div>
+                    ) : (
+                      reminders.map(rem => (
+                        <div key={rem.id} className="glass-panel p-5 rounded-xl flex justify-between items-center">
+                          <div>
+                            <h4 className="text-white font-medium">{rem.title}</h4>
+                            <div className="text-xs text-zinc-500">{rem.frequency}</div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-mono">{formatCurrency(rem.amount)}</div>
+                            <div className="text-xs text-emerald-500">
+                              {rem.is_paid ? 'Paid' : `Due: ${new Date(rem.next_due_date).toLocaleDateString()}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            ) : viewMode === 'borrowers' ? (
               // BORROWER VIEW
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {groupedBorrowers.length === 0 ? (
