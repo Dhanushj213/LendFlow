@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -30,8 +30,10 @@ interface Loan {
 
 export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [liabilities, setLiabilities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'active' | 'closed'>('active');
+  const [viewMode, setViewMode] = useState<'loans' | 'borrowers'>('loans');
   const router = useRouter();
   const supabase = createClient();
 
@@ -58,6 +60,13 @@ export default function Dashboard() {
           transactions(*)
         `)
         .order('created_at', { ascending: false });
+
+      // 1.5 Fetch Personal Liabilities
+      const { data: liabilitiesData } = await supabase
+        .from('personal_borrowings')
+        .select('*');
+
+      setLiabilities(liabilitiesData || []);
 
       if (error) throw error;
 
@@ -118,6 +127,47 @@ export default function Dashboard() {
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
 
+  const totalLiabilities = liabilities.reduce((sum, l) => {
+    // Calculate simple interest client side for summary
+    const start = new Date(l.start_date);
+    const now = new Date();
+    const splitDate = new Date().toISOString().split('T')[0]; // simple comparison if needed
+    const diffTime = Math.abs(now.getTime() - start.getTime());
+    const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    let dailyRate = 0;
+    if (l.rate_interval === 'ANNUALLY') dailyRate = (l.interest_rate / 100) / 365.0;
+    else if (l.rate_interval === 'MONTHLY') dailyRate = (l.interest_rate / 100) / 30.0;
+    else dailyRate = l.interest_rate / 100;
+
+    const interest = l.principal_amount * dailyRate * days;
+    return sum + l.principal_amount + interest;
+  }, 0);
+
+  const groupedBorrowers = Object.values(loans.reduce((acc, loan) => {
+    if (!acc[loan.borrower_id]) {
+      acc[loan.borrower_id] = {
+        id: loan.borrower_id,
+        name: loan.borrower?.name || 'Unknown',
+        totalPrincipal: 0,
+        totalInterest: 0,
+        activeCount: 0,
+        totalCount: 0,
+        loans: []
+      };
+    }
+    const borrower = acc[loan.borrower_id];
+    borrower.totalCount++;
+    borrower.loans.push(loan);
+
+    if (loan.status === 'ACTIVE') {
+      borrower.totalPrincipal += loan.current_principal;
+      borrower.totalInterest += loan.accrued_interest;
+      borrower.activeCount++;
+    }
+    return acc;
+  }, {} as Record<string, any>)).filter(b => activeTab === 'active' ? b.activeCount > 0 : b.totalCount - b.activeCount > 0);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center text-zinc-500">
       Syncing Ledger...
@@ -142,6 +192,25 @@ export default function Dashboard() {
             </div>
             <p className="text-zinc-400 text-sm">Portfolio Overview</p>
           </div>
+
+          {/* View Toggle */}
+          <div className="hidden md:flex bg-zinc-900 border border-zinc-800 rounded-lg p-1 mr-auto ml-8">
+            <button
+              onClick={() => setViewMode('loans')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${viewMode === 'loans' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+              <Users className="w-3 h-3" /> All Loans
+            </button>
+            <button
+              onClick={() => setViewMode('borrowers')}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all flex items-center gap-2 ${viewMode === 'borrowers' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+              <Users className="w-3 h-3" /> Group by Borrower
+            </button>
+          </div>
+
           <div className="flex gap-4">
             <button
               onClick={async () => { await supabase.auth.signOut(); router.push('/auth'); }}
@@ -157,6 +226,13 @@ export default function Dashboard() {
               <Calculator className="w-5 h-5" />
             </Link>
             <Link
+              href="/liabilities"
+              className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
+              title="My Borrowings"
+            >
+              <Wallet className="w-5 h-5 text-red-400" />
+            </Link>
+            <Link
               href="/create"
               className="group flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg hover:shadow-emerald-900/20"
             >
@@ -167,7 +243,7 @@ export default function Dashboard() {
         </header>
 
         {/* Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="glass-panel p-6 rounded-xl">
             <div className="flex items-center gap-3 mb-2">
               <div className="p-2 bg-emerald-500/10 rounded-lg">
@@ -203,6 +279,21 @@ export default function Dashboard() {
               {loans.filter(l => l.status === 'CLOSED').length} Settled
             </div>
           </div>
+
+          <Link href="/liabilities" className="glass-panel p-6 rounded-xl hover:border-red-500/50 transition-colors group">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-red-500/10 rounded-lg group-hover:bg-red-500/20 transition-colors">
+                <Wallet className="w-5 h-5 text-red-500" />
+              </div>
+              <span className="text-zinc-400 text-sm font-medium">My Liabilities</span>
+            </div>
+            <div className="text-2xl font-bold text-white">
+              {formatCurrency(totalLiabilities)}
+            </div>
+            <div className="text-xs text-zinc-500 mt-1">
+              Total Owed
+            </div>
+          </Link>
         </div>
 
         {/* Tabs */}
@@ -232,7 +323,45 @@ export default function Dashboard() {
         {/* List Content */}
         <section>
           <div className="grid gap-4">
-            {activeTab === 'active' ? (
+            {viewMode === 'borrowers' ? (
+              // BORROWER VIEW
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {groupedBorrowers.length === 0 ? (
+                  <div className="col-span-full text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
+                    No borrowers found.
+                  </div>
+                ) : (
+                  groupedBorrowers.map((b: any) => (
+                    <Link
+                      key={b.id}
+                      href={`/borrowers/${b.id}`}
+                      className="glass-panel p-5 rounded-xl block hover:border-emerald-500/50 transition-colors group"
+                    >
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">{b.name}</h3>
+                          <div className="text-xs text-zinc-500 mt-1">{b.activeCount} Active Loans</div>
+                        </div>
+                        <div className="p-2 bg-zinc-800 rounded-lg text-zinc-400 group-hover:bg-emerald-500/10 group-hover:text-emerald-500 transition-colors">
+                          <Users className="w-4 h-4" />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50">
+                        <div>
+                          <span className="text-xs text-zinc-500 block mb-1">Total Principal</span>
+                          <span className="text-white font-mono">{formatCurrency(b.totalPrincipal)}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs text-zinc-500 block mb-1">Total Interest</span>
+                          <span className="text-blue-400 font-mono">{formatCurrency(b.totalInterest)}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  ))
+                )}
+              </div>
+            ) : activeTab === 'active' ? (
               // ACTIVE LOANS
               loans.filter(l => l.status === 'ACTIVE').length === 0 ? (
                 <div className="text-zinc-500 text-center py-12 border border-zinc-800 border-dashed rounded-xl">
@@ -329,6 +458,8 @@ export default function Dashboard() {
                 ))
               )
             )}
+
+            {/* Mobile View Toggle (Floating or bottom) can go here if needed, but header toggle works for now */}
           </div>
         </section>
 
