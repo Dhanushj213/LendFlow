@@ -481,7 +481,7 @@ export default function LoanDetail() {
                 {/* Transactions */}
                 <section>
                     <h3 className="text-xl font-bold text-white mb-4">Transaction History</h3>
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-x-auto">
                         <table className="w-full text-left">
                             <thead className="bg-zinc-950 border-b border-zinc-800 text-zinc-400 text-sm">
                                 <tr>
