@@ -41,6 +41,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: '',
                 frequency: 'YEARLY',
                 next_due_date: new Date().toISOString().split('T')[0],
+                maturity_date: '',
                 policy_number: '',
                 reminder_days_before: '1'
             });
@@ -92,6 +93,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: '',
                 frequency: 'YEARLY',
                 next_due_date: new Date().toISOString().split('T')[0],
+                maturity_date: '',
                 policy_number: '',
                 reminder_days_before: '1'
             });

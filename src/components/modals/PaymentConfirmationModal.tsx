@@ -7,7 +7,7 @@ interface PaymentConfirmationModalProps {
     onClose: () => void;
     onConfirm: (details: any) => Promise<void>;
     item: any; // The item being paid
-    category: 'EMI' | 'INSURANCE' | 'REMINDER';
+    category: 'EMI' | 'INSURANCE' | 'REMINDER' | 'SIP';
 }
 
 export default function PaymentConfirmationModal({ isOpen, onClose, onConfirm, item, category }: PaymentConfirmationModalProps) {
@@ -84,8 +84,8 @@ export default function PaymentConfirmationModal({ isOpen, onClose, onConfirm, i
                                     key={m.id}
                                     onClick={() => setMode(m.id)}
                                     className={`flex flex-col items-center justify-center p-3 rounded-xl border transition-all ${mode === m.id
-                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                                            : 'bg-zinc-800/30 border-zinc-800 text-zinc-500 hover:bg-zinc-800'
+                                        ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                                        : 'bg-zinc-800/30 border-zinc-800 text-zinc-500 hover:bg-zinc-800'
                                         }`}
                                 >
                                     <m.icon className="w-5 h-5 mb-1" />

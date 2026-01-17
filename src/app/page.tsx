@@ -114,7 +114,7 @@ export default function Dashboard() {
   // Payment Modal State
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentItem, setPaymentItem] = useState<any | null>(null);
-  const [paymentCategory, setPaymentCategory] = useState<'EMI' | 'INSURANCE' | 'REMINDER'>('EMI');
+  const [paymentCategory, setPaymentCategory] = useState<'EMI' | 'INSURANCE' | 'REMINDER' | 'SIP'>('EMI');
 
   // UX State
   const [hideAmounts, setHideAmounts] = useState(false);
@@ -419,7 +419,6 @@ export default function Dashboard() {
         payment_mode: details.payment_mode,
         category: paymentCategory,
         reference_id: paymentItem.id,
-        reference_id: paymentItem.id,
         title: paymentItem.name || paymentItem.title || paymentItem.fund_name || (paymentCategory === 'SIP' ? paymentItem.fund_name : 'Unknown Payment')
       });
       if (historyError) throw historyError;
@@ -676,13 +675,15 @@ export default function Dashboard() {
             >
               Sign Out
             </button>
-            <Link
-              href="/history"
-              className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
-              title="Payment History"
-            >
-              <History className="w-5 h-5 text-emerald-500" />
-            </Link>
+            {viewMode === 'emis' && (
+              <Link
+                href="/history"
+                className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"
+                title="Payment History"
+              >
+                <History className="w-5 h-5 text-emerald-500" />
+              </Link>
+            )}
             <Link
               href="/calculator"
               className="p-2 text-zinc-500 hover:text-white transition-colors hover:bg-zinc-800 rounded-full"

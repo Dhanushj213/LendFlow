@@ -46,6 +46,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 interest_rate: '',
                 tenure_months: '',
                 start_date: new Date().toISOString().split('T')[0],
+                end_date: '',
                 manual_emi: '',
                 reminder_days_before: '1'
             });
@@ -137,6 +138,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 interest_rate: '',
                 tenure_months: '',
                 start_date: new Date().toISOString().split('T')[0],
+                end_date: '',
                 manual_emi: '',
                 reminder_days_before: '1'
             });
@@ -308,5 +310,6 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                     </button>
                 </div>
             </div>
-            );
+        </div>
+    );
 }
