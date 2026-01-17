@@ -311,6 +311,22 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* Mobile View Toggle */}
+        <div className="flex md:hidden w-full bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('loans')}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 ${viewMode === 'loans' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Users className="w-3 h-3" /> All
+          </button>
+          <button
+            onClick={() => setViewMode('borrowers')}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 ${viewMode === 'borrowers' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Users className="w-3 h-3" /> Grouped
+          </button>
+        </div>
+
         {/* Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="glass-panel p-6 rounded-xl">
