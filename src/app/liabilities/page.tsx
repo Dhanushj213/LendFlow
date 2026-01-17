@@ -34,8 +34,11 @@ export default function Liabilities() {
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
+    const [editId, setEditId] = useState<string | null>(null);
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergeName, setMergeName] = useState('');
+    const [deleteId, setDeleteId] = useState<string | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const [form, setForm] = useState({
         lender_name: '',
@@ -159,15 +162,29 @@ export default function Liabilities() {
         setIsAdding(true); // Reuse the add modal/form visibility
     };
 
-    const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    const handleDeleteClick = (id: string, e?: React.MouseEvent) => {
         if (e) e.stopPropagation();
-        if (!confirm('Are you sure you want to delete this record?')) return;
+        setDeleteId(id);
+        setShowDeleteModal(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!deleteId) return;
+
+        // Optimistic Update
+        const previousLiabilities = [...liabilities];
+        setLiabilities(prev => prev.filter(l => l.id !== deleteId));
+        setShowDeleteModal(false);
+
         try {
-            const { error } = await supabase.from('personal_borrowings').delete().eq('id', id);
+            const { error } = await supabase.from('personal_borrowings').delete().eq('id', deleteId);
             if (error) throw error;
-            fetchLiabilities();
         } catch (e) {
             console.error(e);
+            alert('Error deleting record');
+            setLiabilities(previousLiabilities); // Revert
+        } finally {
+            setDeleteId(null);
         }
     };
 
@@ -398,7 +415,7 @@ export default function Liabilities() {
 
                                     <div className="flex justify-end absolute top-4 right-4 gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button onClick={() => handleEditClick(l)} className="p-2 text-zinc-600 hover:text-white bg-zinc-800 rounded-lg font-medium text-xs">Edit</button>
-                                        <button onClick={(e) => handleDelete(l.id, e)} className="p-2 text-zinc-600 hover:text-red-500 bg-zinc-800 rounded-lg font-medium text-xs"><Trash2 className="w-3 h-3" /></button>
+                                        <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-2 text-zinc-600 hover:text-red-500 bg-zinc-800 rounded-lg font-medium text-xs"><Trash2 className="w-3 h-3" /></button>
                                     </div>
 
                                     <div className="pl-8"> {/* Indent for checkbox */}
@@ -494,6 +511,20 @@ export default function Liabilities() {
                         <div className="flex gap-3">
                             <button onClick={() => setShowMergeModal(false)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-white">Cancel</button>
                             <button onClick={handleMerge} className="flex-1 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500">Merge</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-6">
+                        <h3 className="text-lg font-bold text-white mb-2">Confirm Deletion</h3>
+                        <p className="text-zinc-400 text-sm mb-6">Are you sure you want to delete this record? This action cannot be undone.</p>
+                        <div className="flex gap-3">
+                            <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2 rounded-lg bg-zinc-800 text-white">Cancel</button>
+                            <button onClick={confirmDelete} className="flex-1 py-2 rounded-lg bg-red-600 text-white hover:bg-red-500">Delete</button>
                         </div>
                     </div>
                 </div>
