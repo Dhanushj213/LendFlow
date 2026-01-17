@@ -497,36 +497,37 @@ export default function Dashboard() {
           </Link>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-6 border-b border-zinc-800">
-          <button
-            onClick={() => setActiveTab('active')}
-            className={`pb-4 text-sm font-medium transition-all relative ${activeTab === 'active' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-          >
-            Active Portfolio
-            {activeTab === 'active' && (
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full" />
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('closed')}
-            className={`pb-4 text-sm font-medium transition-all relative ${activeTab === 'closed' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-          >
-            Closed History
-            {activeTab === 'closed' && (
-              <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full" />
-            )}
-          </button>
-        </div>
+        {/* Tabs - Only show for Loans view */}
+        {!['emis', 'borrowers'].includes(viewMode) && (
+          <div className="flex gap-6 border-b border-zinc-800">
+            <button
+              onClick={() => setActiveTab('active')}
+              className={`pb-4 text-sm font-medium transition-all relative ${activeTab === 'active' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+              Active Portfolio
+              {activeTab === 'active' && (
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full" />
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab('closed')}
+              className={`pb-4 text-sm font-medium transition-all relative ${activeTab === 'closed' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                }`}
+            >
+              Closed History
+              {activeTab === 'closed' && (
+                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-emerald-500 rounded-t-full" />
+              )}
+            </button>
+          </div>
+        )}
 
         {/* List Content */}
         <section>
           <div className="grid gap-4">
             {viewMode === 'emis' && (
               <>
-              // EMI & REMINDERS VIEW
                 {/* Upcoming Payments (Next 30 Days) */}
                 <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-6 rounded-xl relative overflow-hidden">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
