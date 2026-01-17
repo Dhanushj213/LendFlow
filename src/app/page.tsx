@@ -419,7 +419,8 @@ export default function Dashboard() {
         payment_mode: details.payment_mode,
         category: paymentCategory,
         reference_id: paymentItem.id,
-        title: paymentItem.name || paymentItem.title || paymentItem.fund_name || 'Unknown Payment'
+        reference_id: paymentItem.id,
+        title: paymentItem.name || paymentItem.title || paymentItem.fund_name || (paymentCategory === 'SIP' ? paymentItem.fund_name : 'Unknown Payment')
       });
       if (historyError) throw historyError;
 

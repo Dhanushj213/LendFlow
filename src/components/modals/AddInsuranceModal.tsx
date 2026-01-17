@@ -17,6 +17,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
         premium_amount: '',
         frequency: 'YEARLY',
         next_due_date: new Date().toISOString().split('T')[0],
+        maturity_date: '',
         policy_number: '',
         reminder_days_before: '1'
     });
@@ -29,6 +30,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: initialData.premium_amount.toString(),
                 frequency: initialData.frequency,
                 next_due_date: initialData.next_due_date,
+                maturity_date: initialData.maturity_date || '',
                 policy_number: initialData.policy_number || '',
                 reminder_days_before: initialData.reminder_days_before?.toString() || '1'
             });
@@ -62,6 +64,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: parseFloat(form.premium_amount),
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
+                maturity_date: form.maturity_date || null,
                 policy_number: form.policy_number,
                 reminder_days_before: parseInt(form.reminder_days_before) || 1
             };
@@ -170,6 +173,17 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                                 onChange={e => setForm({ ...form, next_due_date: e.target.value })}
                             />
                         </div>
+                        <div>
+                            <label className="text-xs text-zinc-400 block mb-1">Maturity Date (Optional)</label>
+                            <input
+                                type="date"
+                                className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                value={form.maturity_date}
+                                onChange={e => setForm({ ...form, maturity_date: e.target.value })}
+                            />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs text-zinc-400 block mb-1">Policy Number (Optional)</label>
                             <input
