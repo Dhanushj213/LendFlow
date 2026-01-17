@@ -265,21 +265,29 @@ export default function Dashboard() {
     const stats = calculateAmortization(emi);
     const r = emi.interest_rate / 12 / 100;
     const currentPrincipal = stats.currentPrincipal;
-    const newPrincipal = Math.max(0, currentPrincipal - prepayAmount);
+    const prepayAmountNum = Number(prepayAmount);
+    const newPrincipal = Math.max(0, currentPrincipal - prepayAmountNum);
 
     // Calculate new tenure with same EMI
-    // n = -log(1 - (r * P) / EMI) / log(1 + r)
     let newTenure = 0;
-    if (r === 0) newTenure = newPrincipal / emi.amount;
-    else {
+    const oldTenure = emi.remaining_months;
+
+    if (r === 0) {
+      newTenure = newPrincipal / emi.amount;
+    } else {
       const numerator = -Math.log(1 - (r * newPrincipal) / emi.amount);
       const denominator = Math.log(1 + r);
       newTenure = numerator / denominator;
     }
 
+    const calculatedNewTenure = Math.max(0, Math.ceil(newTenure));
+    const monthsSaved = Math.max(0, oldTenure - calculatedNewTenure);
+    const isPartialReduction = monthsSaved === 0 && prepayAmountNum > 0;
+
     return {
-      newTenure: Math.max(0, Math.ceil(newTenure)),
-      monthsSaved: Math.max(0, emi.remaining_months - Math.ceil(newTenure))
+      newTenure: calculatedNewTenure,
+      monthsSaved: monthsSaved,
+      isPartialReduction
     };
   };
 
@@ -925,7 +933,16 @@ export default function Dashboard() {
                                 </div>
                               </div>
                               <div className="text-xs text-emerald-400 text-center">
-                                Paying <span className="font-bold">{formatCurrency(prepayAmount)}</span> reduces tenure from {emi.remaining_months} to <span className="font-bold">{simResult?.newTenure} months</span>.
+                                {simResult?.isPartialReduction ? (
+                                  <>
+                                    Paying <span className="font-bold">{formatCurrency(prepayAmount)}</span> reduces your final EMI amount by <span className="font-bold">{formatCurrency(prepayAmount)}</span>.
+                                    <br /><span className="opacity-70 text-[10px]">(Not enough to skip a full month yet)</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    Paying <span className="font-bold">{formatCurrency(prepayAmount)}</span> reduces tenure from {emi.remaining_months} to <span className="font-bold">{simResult?.newTenure} months</span>.
+                                  </>
+                                )}
                               </div>
                             </div>
                           )}
