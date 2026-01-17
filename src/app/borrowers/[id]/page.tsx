@@ -77,6 +77,62 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
         .filter(l => l.status === 'ACTIVE')
         .reduce((sum, l) => sum + l.accrued_interest, 0);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [editName, setEditName] = useState('');
+
+    const handleRename = async () => {
+        if (!borrower || !editName.trim()) return;
+
+        try {
+            const { error } = await supabase
+                .from('borrowers')
+                .update({ name: editName })
+                .eq('id', borrower.id);
+
+            if (error) throw error;
+            setBorrower({ ...borrower, name: editName });
+            setIsEditing(false);
+        } catch (e) {
+            console.error(e);
+            alert('Error renaming borrower');
+        }
+    };
+
+    const handleUnmerge = async (loanId: string, loanTitle: string) => {
+        if (!confirm('Are you sure you want to detach this loan?')) return;
+        try {
+            // 1. Create or Find Borrower for just this loan
+            // Ideally we find existing, but simple way is create new one with title name
+            const newName = loanTitle || 'Unbundled Loan';
+
+            const { data: newBorrower, error: createError } = await supabase
+                .from('borrowers')
+                .insert({ name: newName, user_id: (await supabase.auth.getUser()).data.user?.id })
+                .select()
+                .single();
+
+            if (createError) throw createError;
+
+            // 2. Move Loan
+            const { error: moveError } = await supabase
+                .from('loans')
+                .update({
+                    borrower_id: newBorrower.id,
+                    title: null // Clear title as it is now the borrower name
+                })
+                .eq('id', loanId);
+
+            if (moveError) throw moveError;
+
+            // 3. Update Local State
+            setLoans(loans.filter(l => l.id !== loanId));
+
+        } catch (e) {
+            console.error(e);
+            alert('Error detaching loan');
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Loading Profile...</div>;
     if (!borrower) return <div className="min-h-screen bg-black flex items-center justify-center text-zinc-500">Borrower not found</div>;
 
@@ -84,17 +140,28 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
         <main className="min-h-screen bg-black p-4 md:p-8">
             <div className="max-w-4xl mx-auto space-y-8">
                 {/* Header */}
-                <div className="flex items-center gap-4">
-                    <Link href="/" className="p-2 hover:bg-zinc-900 rounded-full text-zinc-500 hover:text-white transition-colors">
-                        <ArrowLeft className="w-5 h-5" />
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-white">{borrower.name}</h1>
-                        <div className="flex gap-4 text-sm text-zinc-500 mt-1">
-                            {borrower.phone && <span>{borrower.phone}</span>}
-                            {borrower.email && <span>{borrower.email}</span>}
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <Link href="/" className="p-2 hover:bg-zinc-900 rounded-full text-zinc-500 hover:text-white transition-colors">
+                            <ArrowLeft className="w-5 h-5" />
+                        </Link>
+                        <div>
+                            <h1 className="text-2xl md:text-3xl font-bold text-white">{borrower.name}</h1>
+                            <div className="flex gap-4 text-sm text-zinc-500 mt-1">
+                                {borrower.phone && <span>{borrower.phone}</span>}
+                                {borrower.email && <span>{borrower.email}</span>}
+                            </div>
                         </div>
                     </div>
+                    <button
+                        onClick={() => {
+                            setEditName(borrower.name);
+                            setIsEditing(true);
+                        }}
+                        className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-lg transition-colors text-sm font-medium"
+                    >
+                        Edit Group
+                    </button>
                 </div>
 
                 {/* Combined Stats */}
@@ -186,6 +253,72 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
                     </div>
                 </section>
             </div>
+
+            {/* Edit Modal */}
+            {isEditing && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6 max-h-[90vh] flex flex-col">
+                        <h3 className="text-xl font-bold text-white mb-6">Edit Group</h3>
+
+                        <div className="space-y-6 flex-1 overflow-y-auto min-h-0">
+                            {/* Rename Section */}
+                            <div>
+                                <label className="text-xs text-zinc-500 block mb-2">Group Name</label>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={editName}
+                                        onChange={e => setEditName(e.target.value)}
+                                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                                        placeholder="Borrower Name"
+                                    />
+                                    <button
+                                        onClick={handleRename}
+                                        disabled={!editName.trim() || editName === borrower.name}
+                                        className="px-4 bg-zinc-800 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        Save
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Un-merge Section */}
+                            <div>
+                                <h4 className="text-sm font-medium text-zinc-400 mb-3">Manage Portfolios</h4>
+                                <div className="space-y-3">
+                                    {loans.map(loan => (
+                                        <div key={loan.id} className="bg-zinc-950 border border-zinc-800 p-3 rounded-lg flex items-center justify-between">
+                                            <div>
+                                                <div className="text-sm text-white font-medium">
+                                                    {(loan as any).title || 'Untitled Portfolio'}
+                                                </div>
+                                                <div className="text-xs text-zinc-500">
+                                                    {formatCurrency(loan.principal_amount)} • {new Date(loan.start_date).toLocaleDateString()}
+                                                </div>
+                                            </div>
+                                            <button
+                                                onClick={() => handleUnmerge(loan.id, (loan as any).title)}
+                                                className="text-xs text-red-500 hover:bg-red-500/10 px-3 py-1.5 rounded transition-colors"
+                                            >
+                                                Un-merge
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-6 pt-4 border-t border-zinc-800">
+                            <button
+                                onClick={() => setIsEditing(false)}
+                                className="w-full py-3 rounded-xl font-medium bg-zinc-800 text-zinc-400 hover:bg-zinc-700 transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main>
     );
 }
