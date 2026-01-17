@@ -34,7 +34,8 @@ export default function HistoryPage() {
                 .from('payment_history')
                 .select('*')
                 .eq('user_id', user.id)
-                .order('payment_date', { ascending: false });
+                .order('payment_date', { ascending: false })
+                .order('created_at', { ascending: false });
 
             if (error) throw error;
             setHistory(data || []);
