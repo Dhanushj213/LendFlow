@@ -101,6 +101,11 @@ export default function Dashboard() {
   const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
   const [mergeName, setMergeName] = useState('');
 
+  // Payment Modal State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentItem, setPaymentItem] = useState<any | null>(null);
+  const [paymentCategory, setPaymentCategory] = useState<'EMI' | 'INSURANCE' | 'REMINDER'>('EMI');
+
   // UX State
   const [hideAmounts, setHideAmounts] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
@@ -1378,6 +1383,13 @@ export default function Dashboard() {
           onClose={() => setShowReminderModal(false)}
           onSuccess={() => fetchLoans((supabase.auth.getUser() as any).data?.user?.id)}
           initialData={editingReminder}
+        />
+        <PaymentConfirmationModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onConfirm={handleConfirmPayment}
+          item={paymentItem}
+          type={paymentCategory}
         />
 
         <footer className="text-center text-zinc-600 text-[10px] uppercase tracking-widest py-8">
