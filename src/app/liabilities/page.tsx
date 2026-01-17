@@ -34,7 +34,6 @@ export default function Liabilities() {
     const [isAdding, setIsAdding] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [editId, setEditId] = useState<string | null>(null);
-    const [editId, setEditId] = useState<string | null>(null);
     const [showMergeModal, setShowMergeModal] = useState(false);
     const [mergeName, setMergeName] = useState('');
     const [deleteId, setDeleteId] = useState<string | null>(null);
