@@ -958,14 +958,14 @@ export default function Liabilities() {
                                     </div>
 
                                     {/* Stats Grid */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                                         <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                             <div className="text-xs text-zinc-500 mb-1">Principal Remaining</div>
-                                            <div className="text-[1.1rem] font-mono text-white break-all">{formatCurrency(item.principal_amount)}</div>
+                                            <div className="text-lg md:text-xl font-mono text-white break-all">{formatCurrency(item.principal_amount)}</div>
                                         </div>
                                         <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                             <div className="text-xs text-zinc-500 mb-1">Total Due</div>
-                                            <div className="text-[1.1rem] font-mono text-emerald-400 break-all">{formatCurrency(item.total_due || 0)}</div>
+                                            <div className="text-lg md:text-xl font-mono text-emerald-400 break-all">{formatCurrency(item.total_due || 0)}</div>
                                             <div className="text-[10px] text-zinc-600 mt-1 break-all">
                                                 Incl. {formatCurrency(item.accrued_interest || 0)} Interest
                                             </div>
