@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Wallet, TrendingUp, Calendar, ChevronRight } from 'lucide-react';
 
@@ -25,7 +25,9 @@ interface Loan {
     principal_amount: number;
 }
 
-export default function BorrowerProfile({ params }: { params: { id: string } }) {
+export default function BorrowerProfile() {
+    const params = useParams(); // Use generic params
+    const id = params.id as string; // Explicitly get id
     const [borrower, setBorrower] = useState<Borrower | null>(null);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [loading, setLoading] = useState(true);
@@ -35,12 +37,14 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
 
     useEffect(() => {
         const fetchData = async () => {
+            if (!id) return; // Guard against undefined ID
+
             try {
                 // 1. Fetch Borrower Details
                 const { data: borrowerData, error: borrowerError } = await supabase
                     .from('borrowers')
                     .select('*')
-                    .eq('id', params.id)
+                    .eq('id', id)
                     .single();
 
                 if (borrowerError) throw borrowerError;
@@ -50,7 +54,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
                 const { data: loansData, error: loansError } = await supabase
                     .from('loans')
                     .select('*, borrower:borrowers(name)')
-                    .eq('borrower_id', params.id)
+                    .eq('borrower_id', id)
                     .order('created_at', { ascending: false });
 
                 if (loansError) throw loansError;
@@ -66,7 +70,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
         };
 
         fetchData();
-    }, [params.id, router, supabase]);
+    }, [id, router, supabase]);
 
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
@@ -108,7 +112,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
             const { data: loansData, error: loansError } = await supabase
                 .from('loans')
                 .select('*, borrower:borrowers(name)')
-                .neq('borrower_id', params.id) // Not current borrower
+                .neq('borrower_id', id) // Not current borrower
                 .eq('status', 'ACTIVE') // Only active
                 .order('created_at', { ascending: false });
 
@@ -124,7 +128,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
             const { error: updateError } = await supabase
                 .from('loans')
                 .update({
-                    borrower_id: params.id,
+                    borrower_id: id,
                     title: (loan as any).title || loan.borrower.name // Use existing title or borrower name
                 })
                 .eq('id', loan.id);
@@ -185,7 +189,7 @@ export default function BorrowerProfile({ params }: { params: { id: string } }) 
     if (!borrower) return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center text-zinc-500 gap-4 p-4">
             <h2 className="text-xl text-white">Borrower not found</h2>
-            <p className="text-zinc-600">ID: {params.id}</p>
+            <p className="text-zinc-600">ID: {id}</p>
             {errorMsg && (
                 <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-xl max-w-md w-full">
                     <p className="text-red-400 font-mono text-xs break-all">{errorMsg}</p>
