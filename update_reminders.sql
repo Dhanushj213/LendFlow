@@ -1,0 +1,1 @@
+ALTER TABLE reminders ADD COLUMN IF NOT EXISTS is_variable_amount BOOLEAN DEFAULT FALSE;

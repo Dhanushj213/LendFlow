@@ -36,6 +36,9 @@ interface EMI {
   remaining_months: number;
   next_due_date: string;
   status: 'ACTIVE' | 'CLOSED';
+  tenure_months: number;
+  interest_rate: number;
+  start_date?: string;
 }
 
 interface Insurance {
@@ -54,6 +57,7 @@ interface Reminder {
   frequency: string;
   next_due_date: string;
   is_paid: boolean;
+  is_variable_amount?: boolean;
 }
 
 import AddEmiModal from '@/components/modals/AddEmiModal';
@@ -86,6 +90,12 @@ export default function Dashboard() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [selectedForMerge, setSelectedForMerge] = useState<string[]>([]);
   const [mergeName, setMergeName] = useState('');
+
+  // UX State
+  const [hideAmounts, setHideAmounts] = useState(false);
+  const [showUndo, setShowUndo] = useState(false);
+  const [lastActionSnapshot, setLastActionSnapshot] = useState<{ table: string, id: string, data: any } | null>(null);
+
   const router = useRouter();
   const supabase = createClient();
 
@@ -187,8 +197,10 @@ export default function Dashboard() {
     .filter(l => l.status === 'ACTIVE')
     .reduce((sum, l) => sum + l.accrued_interest, 0);
 
-  const formatCurrency = (val: number) =>
-    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
+  const formatCurrency = (val: number) => {
+    if (hideAmounts) return '••••••';
+    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
+  };
 
   const totalLiabilities = liabilities
     .filter(l => l.status === 'ACTIVE')
@@ -210,7 +222,88 @@ export default function Dashboard() {
       return sum + l.principal_amount + interest;
     }, 0);
 
-  const handlePaymentAction = async (item: any, type: 'EMI' | 'INSURANCE' | 'REMINDER', action: 'paid' | 'skip') => {
+  const calculateAmortization = (emi: EMI) => {
+    // Basic flat rate assumption or reducing balance? usually EMI is reducing balance.
+    // However, without full details, we estimate:
+    // Principal Paid So Far = (Tenure - Remaining) / Tenure * Total Principal?
+    // Total Principal can be reverse calculated from EMI if we know rate.
+    // Formula: P = EMI * ((1+r)^n - 1) / (r * (1+r)^n)
+
+    const r = emi.interest_rate / 12 / 100;
+    const n = emi.tenure_months;
+    const emiAmount = emi.amount;
+
+    let principal = 0;
+    if (r === 0) principal = emiAmount * n;
+    else principal = emiAmount * (Math.pow(1 + r, n) - 1) / (r * Math.pow(1 + r, n));
+
+    const monthsPaid = emi.tenure_months - emi.remaining_months;
+
+    // Simulate generic amortization schedule
+    let balance = principal;
+    let totalInterestPaid = 0;
+
+    for (let i = 0; i < monthsPaid; i++) {
+      const interest = balance * r;
+      const principalComponent = emiAmount - interest;
+      balance -= principalComponent;
+      totalInterestPaid += interest;
+    }
+
+    return {
+      originalPrincipal: principal,
+      currentPrincipal: Math.max(0, balance),
+      totalInterestPaid: totalInterestPaid,
+      progress: (monthsPaid / n) * 100
+    };
+  };
+
+  const [simulatingEmiId, setSimulatingEmiId] = useState<string | null>(null);
+  const [prepayAmount, setPrepayAmount] = useState<number>(10000);
+
+  const handleSimulatePrepayment = (emi: EMI) => {
+    const stats = calculateAmortization(emi);
+    const r = emi.interest_rate / 12 / 100;
+    const currentPrincipal = stats.currentPrincipal;
+    const newPrincipal = Math.max(0, currentPrincipal - prepayAmount);
+
+    // Calculate new tenure with same EMI
+    // n = -log(1 - (r * P) / EMI) / log(1 + r)
+    let newTenure = 0;
+    if (r === 0) newTenure = newPrincipal / emi.amount;
+    else {
+      const numerator = -Math.log(1 - (r * newPrincipal) / emi.amount);
+      const denominator = Math.log(1 + r);
+      newTenure = numerator / denominator;
+    }
+
+    return {
+      newTenure: Math.max(0, Math.ceil(newTenure)),
+      monthsSaved: Math.max(0, emi.remaining_months - Math.ceil(newTenure))
+    };
+  };
+
+  const handlePaymentAction = async (item: any, type: 'EMI' | 'INSURANCE' | 'REMINDER', action: 'paid' | 'skip' | 'snooze') => {
+
+    // SNOOZE LOGIC: Just delay the current due date, don't advance the cycle
+    if (action === 'snooze') {
+      const currentDue = new Date(item.next_due_date);
+      currentDue.setDate(currentDue.getDate() + 3); // Snooze for 3 days
+
+      const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
+      const { error } = await supabase
+        .from(table)
+        .update({ next_due_date: currentDue.toISOString() })
+        .eq('id', item.id);
+
+      if (error) console.error(`Error snoozing ${type}:`, error);
+      else {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) fetchLoans(user.id);
+      }
+      return;
+    }
+
     let updates: any = {};
     const currentDue = new Date(item.next_due_date);
     let nextDue = new Date(currentDue);
@@ -244,9 +337,31 @@ export default function Dashboard() {
       if (updates.remaining_months === 0) updates.status = 'CLOSED';
     }
 
-    // Update Database
-    const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
+    // Variable Amount Logic for Reminders
+    if (type === 'REMINDER' && action === 'paid' && item.is_variable_amount) {
+      const actualAmount = prompt(`Confirm actual amount paid for ${item.title}:`, item.amount.toString());
+      if (actualAmount && !isNaN(parseFloat(actualAmount))) {
+        updates.amount = parseFloat(actualAmount);
+      }
+    }
 
+    // UX: Haptics & Snapshot
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+
+    // Save snapshot used for undo
+    // We assume 'item' contains the original state before this update
+    const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
+    setLastActionSnapshot({
+      table,
+      id: item.id,
+      data: { ...item } // clone
+    });
+
+    // Show Undo Toast
+    setShowUndo(true);
+    setTimeout(() => setShowUndo(false), 5000);
+
+    // Update Database
     const { error } = await supabase
       .from(table)
       .update(updates)
@@ -260,6 +375,30 @@ export default function Dashboard() {
     // Refresh Data
     const { data: { user } } = await supabase.auth.getUser();
     if (user) fetchLoans(user.id);
+  };
+
+  const handleUndo = async () => {
+    if (!lastActionSnapshot) return;
+
+    const { table, id, data } = lastActionSnapshot;
+
+    // Haptic
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([50, 50, 50]);
+
+    const { error } = await supabase
+      .from(table)
+      .update(data) // Restore all fields
+      .eq('id', id);
+
+    if (error) {
+      console.error("Undo failed:", error);
+      alert("Undo failed");
+    } else {
+      setShowUndo(false);
+      setLastActionSnapshot(null);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) fetchLoans(user.id);
+    }
   };
 
   const handleMerge = async () => {
@@ -601,32 +740,94 @@ export default function Dashboard() {
                         .filter(item => {
                           const due = new Date(item.date);
                           const today = new Date();
+                          today.setHours(0, 0, 0, 0); // Normalize today
                           const diffTime = due.getTime() - today.getTime();
                           const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                          return diffDays >= -5 && diffDays <= 30; // Show overdue (up to 5 days) + next 30 days
+                          return diffDays >= -60 && diffDays <= 30; // Show overdue (up to 60 days) + next 30 days
                         })
-                        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                        .sort((a, b) => {
+                          // Sort 1: Date Ascending (Overdue first)
+                          const dateDiff = new Date(a.date).getTime() - new Date(b.date).getTime();
+                          if (dateDiff !== 0) return dateDiff;
+                          // Sort 2: Amount Descending (High Value Priority)
+                          return b.amount - a.amount;
+                        })
                         .slice(0, 5); // Show top 5
 
                       if (upcoming.length === 0) return <div className="text-zinc-500 text-sm italic">No upcoming payments due soon.</div>;
 
-                      return upcoming.map((item, idx) => (
-                        <div key={`${item.type}-${item.id}-${idx}`} className="flex justify-between items-center bg-black/40 p-3 rounded-lg border border-zinc-800/50">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full ${item.type === 'EMI' ? 'bg-blue-500' : item.type === 'INSURANCE' ? 'bg-purple-500' : 'bg-orange-500'}`} />
-                            <div>
-                              <div className="text-white font-medium text-sm">{item.name}</div>
-                              <div className="text-[10px] text-zinc-500">{item.type} • {new Date(item.date).toLocaleDateString()}</div>
+                      return upcoming.map((item, idx) => {
+                        const due = new Date(item.date);
+                        const today = new Date();
+                        today.setHours(0, 0, 0, 0);
+                        const diffTime = due.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                        let statusColor = "bg-zinc-800 text-zinc-400";
+                        let statusText = "Upcoming";
+
+                        if (diffDays < 0) {
+                          statusColor = "bg-red-500/10 text-red-500 border border-red-500/20";
+                          statusText = `Overdue by ${Math.abs(diffDays)}d`;
+                        } else if (diffDays === 0) {
+                          statusColor = "bg-orange-500/10 text-orange-500 border border-orange-500/20";
+                          statusText = "Due Today";
+                        } else if (diffDays <= 3) {
+                          statusColor = "bg-yellow-500/10 text-yellow-500 border border-yellow-500/20";
+                          statusText = `Due in ${diffDays}d`;
+                        } else {
+                          statusColor = "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20";
+                          statusText = `In ${diffDays}d`;
+                        }
+
+                        return (
+                          <div key={`${item.type}-${item.id}-${idx}`} className="flex flex-col gap-3 bg-black/40 p-4 rounded-xl border border-zinc-800/50 relative overflow-hidden group">
+                            {/* Status Badge */}
+                            <div className={`absolute top-0 right-0 px-3 py-1 text-[10px] font-bold uppercase tracking-wider rounded-bl-xl ${statusColor}`}>
+                              {statusText}
+                            </div>
+
+                            <div className="flex justify-between items-start mt-2">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)] ${item.type === 'EMI' ? 'bg-blue-500 shadow-blue-500/50' : item.type === 'INSURANCE' ? 'bg-purple-500 shadow-purple-500/50' : 'bg-orange-500 shadow-orange-500/50'}`} />
+                                <div>
+                                  <div className="text-white font-bold text-base">{item.name}</div>
+                                  <div className="text-xs text-zinc-500 font-medium flex gap-2">
+                                    <span>{item.type}</span>
+                                    <span>•</span>
+                                    <span>{new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right mt-1 mr-2">
+                                <div className="text-white font-mono text-lg font-bold tracking-tight">{formatCurrency(item.amount)}</div>
+                              </div>
+                            </div>
+
+                            {/* Quick Actions Row */}
+                            <div className="flex items-center gap-2 mt-1 border-t border-white/5 pt-3">
+                              <button
+                                onClick={() => handlePaymentAction(item, item.type, 'snooze')}
+                                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-zinc-800/50 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-medium"
+                              >
+                                <History className="w-3.5 h-3.5" /> Snooze 3d
+                              </button>
+                              <button
+                                onClick={() => handlePaymentAction(item, item.type, 'skip')}
+                                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-zinc-800/50 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-medium"
+                              >
+                                <SkipForward className="w-3.5 h-3.5" /> Skip
+                              </button>
+                              <button
+                                onClick={() => handlePaymentAction(item, item.type, 'paid')}
+                                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors text-xs font-bold border border-emerald-500/20"
+                              >
+                                <Check className="w-3.5 h-3.5" /> Pay Now
+                              </button>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <div className="text-right mr-2">
-                              <div className="text-white font-mono text-sm">{formatCurrency(item.amount)}</div>
-                              {new Date(item.date) < new Date() && <div className="text-[10px] text-red-400 font-bold">OVERDUE</div>}
-                            </div>
-                          </div>
-                        </div>
-                      ));
+                        );
+                      });
                     })()}
                   </div>
                 </div>
@@ -645,42 +846,92 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {emis.filter(e => e.status === 'ACTIVE').length === 0 ? (
                       <div className="text-zinc-500 text-sm italic">No active EMIs found.</div>
-                    ) : emis.filter(e => e.status === 'ACTIVE').map(emi => (
-                      <div key={emi.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
-                        <div>
-                          <h4 className="text-white font-medium flex items-center gap-2">
-                            {emi.name}
-                            <button
-                              onClick={() => { setEditingEmi(emi); setShowEmiModal(true); }}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          </h4>
-                          <div className="text-xs text-zinc-500">{emi.lender} • {emi.remaining_months} months left</div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
-                          <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
-                          <div className="flex gap-2 justify-end">
-                            <button
-                              onClick={() => handlePaymentAction(emi, 'EMI', 'skip')}
-                              className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                              title="Skip (Advance Date)"
-                            >
-                              <SkipForward className="w-3 h-3" />
-                            </button>
-                            <button
-                              onClick={() => handlePaymentAction(emi, 'EMI', 'paid')}
-                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
-                              title="Mark Paid"
-                            >
-                              <Check className="w-3 h-3" />
-                            </button>
+                    ) : emis.filter(e => e.status === 'ACTIVE').map(emi => {
+                      const stats = calculateAmortization(emi);
+                      const isSimulating = simulatingEmiId === emi.id;
+                      const simResult = isSimulating ? handleSimulatePrepayment(emi) : null;
+
+                      return (
+                        <div key={emi.id} className="glass-panel p-5 rounded-xl block group">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="text-white font-medium flex items-center gap-2 text-lg">
+                                {emi.name}
+                                <button
+                                  onClick={() => { setEditingEmi(emi); setShowEmiModal(true); }}
+                                  className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                              </h4>
+                              <div className="text-xs text-zinc-500">{emi.lender} • {emi.interest_rate}% p.a.</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-white font-mono text-xl">{formatCurrency(emi.amount)}</div>
+                              <div className="text-xs text-zinc-500">per month</div>
+                            </div>
                           </div>
+
+                          {/* Progress Bar */}
+                          <div className="mb-4">
+                            <div className="flex justify-between text-xs text-zinc-400 mb-1">
+                              <span>Progress</span>
+                              <span>{emi.tenure_months - emi.remaining_months} / {emi.tenure_months} months</span>
+                            </div>
+                            <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${stats.progress}%` }} />
+                            </div>
+                          </div>
+
+                          {/* Stats Grid */}
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Principal Due</div>
+                              <div className="text-sm font-mono text-white">{formatCurrency(stats.currentPrincipal)}</div>
+                            </div>
+                            <div className="bg-zinc-900/50 p-3 rounded-lg border border-zinc-800/50">
+                              <div className="text-[10px] text-zinc-500 uppercase tracking-wider mb-1">Interest Paid</div>
+                              <div className="text-sm font-mono text-blue-400">{formatCurrency(stats.totalInterestPaid)}</div>
+                            </div>
+                          </div>
+
+                          {/* Prepayment Simulator Toggle */}
+                          <button
+                            onClick={() => setSimulatingEmiId(isSimulating ? null : emi.id)}
+                            className="w-full py-2 text-xs font-medium text-emerald-500 hover:text-emerald-400 border border-dashed border-emerald-500/30 rounded-lg hover:bg-emerald-500/5 transition-colors mb-2"
+                          >
+                            {isSimulating ? 'Hide Simulator' : '⚡ Simulate Prepayment'}
+                          </button>
+
+                          {/* Simulator UI */}
+                          {isSimulating && (
+                            <div className="bg-emerald-900/10 border border-emerald-500/20 p-4 rounded-lg animate-in slide-in-from-top-2 fade-in">
+                              <div className="flex gap-4 items-center mb-3">
+                                <div className="flex-1">
+                                  <label className="text-[10px] text-emerald-400 uppercase tracking-wider block mb-1">One-time Payment</label>
+                                  <div className="relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-600">₹</span>
+                                    <input
+                                      type="number"
+                                      value={prepayAmount}
+                                      onChange={(e) => setPrepayAmount(Number(e.target.value))}
+                                      className="w-full bg-black/40 border border-emerald-500/30 rounded-md py-1.5 pl-6 pr-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-2xl font-bold text-white">{simResult?.monthsSaved}</div>
+                                  <div className="text-[10px] text-zinc-400">Months Saved</div>
+                                </div>
+                              </div>
+                              <div className="text-xs text-emerald-400 text-center">
+                                Paying <span className="font-bold">{formatCurrency(prepayAmount)}</span> reduces tenure from {emi.remaining_months} to <span className="font-bold">{simResult?.newTenure} months</span>.
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -698,26 +949,62 @@ export default function Dashboard() {
                   <div className="grid gap-4">
                     {insurance.length === 0 ? (
                       <div className="text-zinc-500 text-sm italic">No insurance policies found.</div>
-                    ) : insurance.map(pol => (
-                      <div key={pol.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
-                        <div>
-                          <h4 className="text-white font-medium flex items-center gap-2">
-                            {pol.name}
-                            <button
-                              onClick={() => { setEditingInsurance(pol); setShowInsuranceModal(true); }}
-                              className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          </h4>
-                          <div className="text-xs text-zinc-500">{pol.provider} • {pol.frequency}</div>
+                    ) : insurance.map(pol => {
+                      const due = new Date(pol.next_due_date);
+                      const today = new Date();
+                      today.setHours(0, 0, 0, 0);
+                      const diffTime = due.getTime() - today.getTime();
+                      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                      let statusText = daysLeft < 0 ? 'Expired' : 'Active';
+                      let statusColor = daysLeft < 0 ? 'text-red-500' : 'text-emerald-500';
+
+                      if (daysLeft >= 0 && daysLeft <= 7) {
+                        statusText = `Renew in ${daysLeft}d`;
+                        statusColor = 'text-yellow-500 font-bold animate-pulse';
+                      }
+
+                      return (
+                        <div key={pol.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
+                          <div>
+                            <h4 className="text-white font-medium flex items-center gap-2">
+                              {pol.name}
+                              <button
+                                onClick={() => { setEditingInsurance(pol); setShowInsuranceModal(true); }}
+                                className="opacity-0 group-hover:opacity-100 p-1 text-zinc-500 hover:text-emerald-500 transition-all"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </h4>
+                            <div className="text-xs text-zinc-500 mb-1">{pol.provider} • {pol.frequency}</div>
+                            <div className={`text-xs ${statusColor} flex items-center gap-1`}>
+                              {daysLeft < 0 && <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />}
+                              {statusText}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
+                            <div className="text-xs text-zinc-500 mb-2">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
+                            <div className="flex gap-2 justify-end">
+                              <button
+                                onClick={() => handlePaymentAction(pol, 'INSURANCE', 'skip')}
+                                className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                                title="Skip (Advance Date)"
+                              >
+                                <SkipForward className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handlePaymentAction(pol, 'INSURANCE', 'paid')}
+                                className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                                title="Renew Now"
+                              >
+                                <Check className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
-                          <div className="text-xs text-zinc-500">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 
