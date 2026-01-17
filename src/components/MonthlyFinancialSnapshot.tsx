@@ -4,9 +4,10 @@ interface MonthlyFinancialSnapshotProps {
     emis: any[];
     insurance: any[];
     reminders: any[];
+    sips: any[];
 }
 
-export default function MonthlyFinancialSnapshot({ emis, insurance, reminders }: MonthlyFinancialSnapshotProps) {
+export default function MonthlyFinancialSnapshot({ emis, insurance, reminders, sips }: MonthlyFinancialSnapshotProps) {
     // 1. Calculate Totals
     const today = new Date();
     const currentMonth = today.getMonth();
@@ -64,6 +65,7 @@ export default function MonthlyFinancialSnapshot({ emis, insurance, reminders }:
     emis.filter(e => e.status === 'ACTIVE').forEach(e => processItem(e, e.amount, e.next_due_date, e.name));
     insurance.forEach(i => processItem(i, i.premium_amount, i.next_due_date, i.name));
     reminders.filter(r => !r.is_paid).forEach(r => processItem(r, r.amount, r.next_due_date, r.title));
+    sips?.forEach(s => processItem(s, s.amount, s.next_due_date, s.fund_name));
 
     const formatCurrency = (val: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
 

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft, Pencil, SkipForward } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft, Pencil, SkipForward, Trash2 } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -63,9 +63,19 @@ interface Reminder {
   reminder_days_before?: number;
 }
 
+interface Sip {
+  id: string;
+  fund_name: string;
+  amount: number;
+  sip_date: number;
+  next_due_date: string;
+  folio_number?: string;
+}
+
 import AddEmiModal from '@/components/modals/AddEmiModal';
 import AddInsuranceModal from '@/components/modals/AddInsuranceModal';
 import AddReminderModal from '@/components/modals/AddReminderModal';
+import AddSipModal from '@/components/modals/AddSipModal';
 import PaymentConfirmationModal from '@/components/modals/PaymentConfirmationModal';
 import MonthlyFinancialSnapshot from '@/components/MonthlyFinancialSnapshot';
 
@@ -77,11 +87,13 @@ export default function Dashboard() {
   const [emis, setEmis] = useState<EMI[]>([]);
   const [insurance, setInsurance] = useState<Insurance[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [sips, setSips] = useState<Sip[]>([]);
 
   // Modal States
   const [showEmiModal, setShowEmiModal] = useState(false);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+  const [showSipModal, setShowSipModal] = useState(false);
 
   // Payment Confirmation State
 
@@ -212,6 +224,9 @@ export default function Dashboard() {
       setInsurance(insData || []);
       setReminders(remData || []);
 
+      const { data: sipsData } = await supabase.from('mutual_fund_sips').select('*');
+      setSips(sipsData || []);
+
       if (error) throw error;
 
       // 2. Trigger Interest Engine for ACTIVE loans
@@ -333,6 +348,24 @@ export default function Dashboard() {
 
   const [simulatingEmiId, setSimulatingEmiId] = useState<string | null>(null);
   const [prepayAmount, setPrepayAmount] = useState<number>(10000);
+
+  const handleCloseEmi = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to close this EMI: ${name}?`)) return;
+
+    try {
+      const { error } = await supabase.from('emis').update({ status: 'CLOSED' }).eq('id', id);
+      if (error) throw error;
+
+      // Optimistic update
+      setEmis(prev => prev.map(e => e.id === id ? { ...e, status: 'CLOSED' } : e));
+
+      // Notify
+      if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
+    } catch (e) {
+      console.error('Failed to close EMI:', e);
+      alert('Failed to close EMI');
+    }
+  };
 
   const handleSimulatePrepayment = (emi: EMI) => {
     const stats = calculateAmortization(emi);
@@ -820,7 +853,7 @@ export default function Dashboard() {
             {viewMode === 'emis' && (
               <>
                 {/* Monthly Snapshot */}
-                <MonthlyFinancialSnapshot emis={emis} insurance={insurance} reminders={reminders} />
+                <MonthlyFinancialSnapshot emis={emis} insurance={insurance} reminders={reminders} sips={sips} />
 
                 {/* Due Soon (Upcoming) */}
                 <div className="mb-6">
@@ -830,7 +863,8 @@ export default function Dashboard() {
                       const allItems = [
                         ...emis.filter(e => e.status === 'ACTIVE').map(e => ({ ...e, type: 'EMI', date: e.next_due_date }) as any),
                         ...insurance.map(i => ({ ...i, type: 'INSURANCE', date: i.next_due_date, amount: i.premium_amount }) as any),
-                        ...reminders.filter(r => !r.is_paid).map(r => ({ ...r, type: 'REMINDER', name: r.title, date: r.next_due_date }) as any)
+                        ...reminders.filter(r => !r.is_paid).map(r => ({ ...r, type: 'REMINDER', name: r.title, date: r.next_due_date }) as any),
+                        ...sips.map(s => ({ ...s, type: 'SIP', name: s.fund_name, date: s.next_due_date }) as any)
                       ];
 
                       const upcoming = allItems
@@ -953,7 +987,16 @@ export default function Dashboard() {
                               <div className="text-xs text-zinc-500">{emi.lender} • {emi.interest_rate}% p.a.</div>
                             </div>
                             <div className="text-right">
-                              <div className="text-white font-mono text-xl">{formatCurrency(emi.amount)}</div>
+                              <div className="flex items-center justify-end gap-2 mb-1">
+                                <div className="text-white font-mono text-xl">{formatCurrency(emi.amount)}</div>
+                                <button
+                                  onClick={() => handleCloseEmi(emi.id, emi.name)}
+                                  className="p-1.5 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all"
+                                  title="Close Loan (Remove)"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
                               <div className="text-xs text-zinc-500">per month</div>
                             </div>
                           </div>
@@ -1128,6 +1171,39 @@ export default function Dashboard() {
                           <div className="text-white font-mono">{formatCurrency(rem.amount)}</div>
                           <div className="text-xs text-emerald-500">
                             {rem.is_paid ? 'Paid' : `Due: ${new Date(rem.next_due_date).toLocaleDateString()}`}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mutual Fund SIPs List */}
+                <div>
+                  <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-xl font-bold text-white">Mutual Fund SIPs</h3>
+                    <button
+                      onClick={() => setShowSipModal(true)}
+                      className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors"
+                    >
+                      + Add SIP
+                    </button>
+                  </div>
+                  <div className="grid gap-4">
+                    {sips.length === 0 ? (
+                      <div className="text-zinc-500 text-sm italic">No active SIPs found.</div>
+                    ) : sips.map(sip => (
+                      <div key={sip.id} className="glass-panel p-5 rounded-xl flex justify-between items-center group">
+                        <div>
+                          <h4 className="text-white font-medium flex items-center gap-2">
+                            {sip.fund_name}
+                          </h4>
+                          <div className="text-xs text-zinc-500">SIP Date: {sip.sip_date}{['st', 'nd', 'rd'][((sip.sip_date + 90) % 100 - 10) % 10 - 1] || 'th'} of month</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white font-mono">{formatCurrency(sip.amount)}</div>
+                          <div className="text-xs text-emerald-500">
+                            Due: {new Date(sip.next_due_date).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
@@ -1381,6 +1457,14 @@ export default function Dashboard() {
           onClose={() => setShowReminderModal(false)}
           onSuccess={() => fetchLoans((supabase.auth.getUser() as any).data?.user?.id)}
           initialData={editingReminder}
+        />
+        <AddSipModal
+          isOpen={showSipModal}
+          onClose={() => setShowSipModal(false)}
+          onSuccess={async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) fetchLoans(user.id);
+          }}
         />
         <PaymentConfirmationModal
           isOpen={showPaymentModal}
