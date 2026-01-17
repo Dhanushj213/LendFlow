@@ -189,7 +189,8 @@ export default function Liabilities() {
         }
     };
 
-    const handleEditClick = (l: Liability) => {
+    const handleEditClick = (l: Liability, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
         setIsEditing(true);
         setEditId(l.id);
         setIsAdding(true);
@@ -797,7 +798,7 @@ export default function Liabilities() {
                                                                         <Edit2 className="w-3.5 h-3.5" />
                                                                     </button>
                                                                     <button
-                                                                        onClick={(e) => handleDelete(l.id, e)}
+                                                                        onClick={(e) => handleDeleteClick(l.id, e)}
                                                                         className="px-2 py-1.5 bg-zinc-900 hover:text-red-400 text-zinc-500 rounded border border-zinc-800 transition-colors"
                                                                     >
                                                                         <Trash2 className="w-3.5 h-3.5" />
