@@ -118,11 +118,14 @@ export default function Liabilities() {
                 principal_amount: parseFloat(form.principal_amount),
                 interest_rate: parseFloat(form.interest_rate) / 100, // % to Decimal
                 rate_interval: form.rate_interval as any,
-                start_date: form.start_date
+                start_date: form.start_date,
+                status: 'ACTIVE'
             };
 
             if (isEditing && editId) {
-                const { error } = await supabase.from('personal_borrowings').update(payload).eq('id', editId);
+                // Remove status from update payload to avoid overwriting closed status if editing
+                const { status, ...updatePayload } = payload;
+                const { error } = await supabase.from('personal_borrowings').update(updatePayload).eq('id', editId);
                 if (error) throw error;
             } else {
                 const { error } = await supabase.from('personal_borrowings').insert(payload);
@@ -142,9 +145,9 @@ export default function Liabilities() {
                 start_date: new Date().toISOString().split('T')[0]
             });
             fetchLiabilities();
-        } catch (e) {
+        } catch (e: any) {
             console.error(e);
-            alert('Error saving record');
+            alert(`Error saving record: ${e.message || JSON.stringify(e)}`);
         }
     };
 
