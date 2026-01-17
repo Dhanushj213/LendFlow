@@ -65,9 +65,9 @@ export default function Liabilities() {
 
                 // Effective Rate per Day
                 let dailyRate = 0;
-                if (l.rate_interval === 'ANNUALLY') dailyRate = (l.interest_rate / 100) / 365.0;
-                else if (l.rate_interval === 'MONTHLY') dailyRate = (l.interest_rate / 100) / 30.0;
-                else dailyRate = l.interest_rate / 100;
+                if (l.rate_interval === 'ANNUALLY') dailyRate = l.interest_rate / 365.0;
+                else if (l.rate_interval === 'MONTHLY') dailyRate = l.interest_rate / 30.0;
+                else dailyRate = l.interest_rate;
 
                 // Simple Interest for now (mimicking the Calculator default)
                 // If user wants Compound, we can add a field later. Defaulting to Simple.
@@ -100,7 +100,7 @@ export default function Liabilities() {
                 user_id: user.id,
                 lender_name: form.lender_name,
                 principal_amount: parseFloat(form.principal_amount),
-                interest_rate: parseFloat(form.interest_rate),
+                interest_rate: parseFloat(form.interest_rate) / 100, // Convert % to decimal
                 rate_interval: form.rate_interval,
                 start_date: form.start_date
             });
@@ -286,7 +286,7 @@ export default function Liabilities() {
                                         <h3 className="text-lg font-medium text-white">{l.lender_name}</h3>
                                         <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
                                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs">
-                                                {l.interest_rate}% {l.rate_interval}
+                                                {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
                                             </span>
                                             <span className="flex items-center gap-1 text-xs">
                                                 <Calendar className="w-3 h-3" /> Since {new Date(l.start_date).toLocaleDateString()}

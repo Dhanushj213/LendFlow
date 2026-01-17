@@ -52,7 +52,7 @@ export default function CreateLoan() {
                     borrower_id: borrower.id,
                     principal_amount: parseFloat(formData.principalAmount),
                     current_principal: parseFloat(formData.principalAmount),
-                    interest_rate: parseFloat(formData.interestRate),
+                    interest_rate: parseFloat(formData.interestRate) / 100, // Convert % to decimal
                     rate_interval: formData.rateType,
                     interest_type: formData.interestType,
                     status: 'ACTIVE',
@@ -127,18 +127,18 @@ export default function CreateLoan() {
 
                         <div className="grid grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium text-zinc-300">Interest Rate (Decimal)</label>
+                                <label className="text-sm font-medium text-zinc-300">Interest Rate (%)</label>
                                 <input
                                     name="interestRate"
                                     type="number"
-                                    step="0.0001"
+                                    step="0.01"
                                     required
                                     className="w-full bg-black border border-zinc-800 rounded-lg py-2.5 px-4 text-white focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 outline-none transition-all"
-                                    placeholder="0.12"
+                                    placeholder="12"
                                     value={formData.interestRate}
                                     onChange={handleChange}
                                 />
-                                <p className="text-xs text-zinc-500">Ex: 0.12 = 12%</p>
+                                <p className="text-xs text-zinc-500">Ex: 12 = 12%</p>
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium text-zinc-300">Rate Period</label>
