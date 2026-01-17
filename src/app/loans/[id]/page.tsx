@@ -421,21 +421,21 @@ export default function LoanDetail() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     {/* Stats */}
-                    <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                    <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
                             <span className="text-zinc-500 text-sm">Principal Balance</span>
-                            <div className="text-2xl font-bold text-white mt-1">{formatCurrency(loan.current_principal)}</div>
+                            <div className="text-2xl font-bold text-white mt-1 break-all">{formatCurrency(loan.current_principal)}</div>
                         </div>
                         <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-xl">
                             <span className="text-zinc-500 text-sm">Accrued Interest</span>
-                            <div className="text-2xl font-bold text-blue-400 mt-1">{formatCurrency(loan.accrued_interest)}</div>
+                            <div className="text-2xl font-bold text-blue-400 mt-1 break-all">{formatCurrency(loan.accrued_interest)}</div>
                         </div>
-                        <div className="col-span-2 bg-gradient-to-r from-zinc-900 to-zinc-900/50 border border-zinc-800 p-6 rounded-xl flex justify-between items-center">
+                        <div className="col-span-1 sm:col-span-2 bg-gradient-to-r from-zinc-900 to-zinc-900/50 border border-zinc-800 p-6 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
                                 <span className="text-zinc-500 text-sm">Total Payoff Amount</span>
-                                <div className="text-2xl md:text-3xl font-bold text-white mt-1">{formatCurrency(totalDue)}</div>
+                                <div className="text-2xl md:text-3xl font-bold text-white mt-1 break-all">{formatCurrency(totalDue)}</div>
                             </div>
-                            <div className="text-right">
+                            <div className="text-left sm:text-right w-full sm:w-auto border-t sm:border-t-0 border-zinc-800 pt-2 sm:pt-0 mt-2 sm:mt-0">
                                 <span className="text-zinc-500 text-sm block">Original Loan</span>
                                 <span className="text-zinc-300 font-mono">{formatCurrency(loan.principal_amount)}</span>
                             </div>
