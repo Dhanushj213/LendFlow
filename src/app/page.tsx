@@ -882,10 +882,10 @@ export default function Dashboard() {
                             </div>
 
                             <div className="flex justify-between items-start mt-2">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)] ${item.type === 'EMI' ? 'bg-blue-500 shadow-blue-500/50' : item.type === 'INSURANCE' ? 'bg-purple-500 shadow-purple-500/50' : 'bg-orange-500 shadow-orange-500/50'}`} />
-                                <div>
-                                  <div className="text-white font-bold text-base">{item.name}</div>
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className={`w-3 h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0 ${item.type === 'EMI' ? 'bg-blue-500 shadow-blue-500/50' : item.type === 'INSURANCE' ? 'bg-purple-500 shadow-purple-500/50' : 'bg-orange-500 shadow-orange-500/50'}`} />
+                                <div className="min-w-0">
+                                  <div className="text-white font-bold text-base truncate pr-2">{item.name}</div>
                                   <div className="text-xs text-zinc-500 font-medium flex gap-2">
                                     <span>{item.type}</span>
                                     <span>•</span>
@@ -893,15 +893,15 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                               </div>
-                              <div className="text-right mt-1 mr-2">
-                                <div className="text-white font-mono text-lg font-bold tracking-tight">{formatCurrency(item.amount)}</div>
+                              <div className="text-right mt-1 ml-auto shrink-0">
+                                <div className="text-white font-mono text-base md:text-lg font-bold tracking-tight">{formatCurrency(item.amount)}</div>
                               </div>
                             </div>
 
                             {/* Quick Actions Row */}
                             <div className="flex items-center gap-2 mt-1 border-t border-white/5 pt-3">
                               <button
-                                onClick={() => handlePaymentAction(item, item.type, 'paid')}
+                                onClick={() => initiatePayment(item, item.type === 'EMI' ? 'EMI' : item.type === 'INSURANCE' ? 'INSURANCE' : 'REMINDER')}
                                 className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors text-xs font-bold border border-emerald-500/20"
                                 title="Mark As Paid"
                               >
