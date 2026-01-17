@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft, Pencil } from 'lucide-react';
+import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft, Pencil, SkipForward } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -209,6 +209,37 @@ export default function Dashboard() {
       const interest = l.principal_amount * dailyRate * days;
       return sum + l.principal_amount + interest;
     }, 0);
+
+  const handleEmiAction = async (emi: EMI, action: 'paid' | 'skip') => {
+    const nextDueDate = new Date(emi.next_due_date);
+    nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+
+    const updates: any = {
+      next_due_date: nextDueDate.toISOString(),
+      remaining_months: emi.remaining_months
+    };
+
+    if (action === 'paid') {
+      updates.remaining_months = Math.max(0, emi.remaining_months - 1);
+      if (updates.remaining_months === 0) {
+        updates.status = 'CLOSED';
+      }
+    }
+
+    const { error } = await supabase
+      .from('emis')
+      .update(updates)
+      .eq('id', emi.id);
+
+    if (error) {
+      console.error('Error updating EMI:', error);
+      alert('Failed to update EMI');
+      return;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) fetchLoans(user.id);
+  };
 
   const handleMerge = async () => {
     if (selectedForMerge.length < 2 || !mergeName.trim()) return;
@@ -441,6 +472,12 @@ export default function Dashboard() {
           >
             <Users className="w-3 h-3" /> Grouped
           </button>
+          <button
+            onClick={() => setViewMode('emis')}
+            className={`flex-1 px-3 py-2 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-2 ${viewMode === 'emis' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+          >
+            <Calendar className="w-3 h-3" /> EMIs
+          </button>
         </div>
 
         {/* Metrics */}
@@ -604,7 +641,23 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
-                          <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
+                          <div className="text-xs text-zinc-500 mb-2">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              onClick={() => handleEmiAction(emi, 'skip')}
+                              className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
+                              title="Skip (Advance Date)"
+                            >
+                              <SkipForward className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleEmiAction(emi, 'paid')}
+                              className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
+                              title="Mark Paid"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
