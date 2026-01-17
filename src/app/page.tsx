@@ -444,7 +444,7 @@ export default function Dashboard() {
                         <div>
                           <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors z-20 relative">
                             <Link href={`/borrowers/${loan.borrower_id}`} onClick={(e) => e.stopPropagation()} className="hover:underline">
-                              {loan.borrower?.name || 'Unknown Borrower'}
+                              {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
                             </Link>
                           </h3>
                           <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
@@ -478,8 +478,8 @@ export default function Dashboard() {
                   <div key={loan.id} className="glass-panel p-6 rounded-xl">
                     <div className="flex justify-between items-start mb-6">
                       <div>
-                        <h3 className="text-lg font-medium text-white">
-                          {loan.borrower?.name || 'Unknown Borrower'}
+                        <h3 className="text-lg font-medium text-white group-hover:text-emerald-400 transition-colors">
+                          {(loan as any).title || loan.borrower?.name || 'Unknown Borrower'}
                         </h3>
                         <span className="inline-flex items-center gap-1.5 mt-2 px-2.5 py-1 rounded-full text-xs font-medium bg-zinc-800 text-zinc-400 border border-zinc-700">
                           <History className="w-3 h-3" /> Settled
