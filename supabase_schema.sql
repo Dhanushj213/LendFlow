@@ -33,3 +33,4 @@ create policy "Users can update own borrowings"
 
 -- 4. Add title column to loans table (for Merge Borrowers feature)
 alter table loans add column if not exists title text;
+alter table personal_borrowings add column if not exists title text;
