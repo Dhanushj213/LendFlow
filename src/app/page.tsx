@@ -39,6 +39,7 @@ interface EMI {
   tenure_months: number;
   interest_rate: number;
   start_date?: string;
+  reminder_days_before?: number;
 }
 
 interface Insurance {
@@ -48,6 +49,7 @@ interface Insurance {
   premium_amount: number;
   frequency: string;
   next_due_date: string;
+  reminder_days_before?: number;
 }
 
 interface Reminder {
@@ -58,6 +60,7 @@ interface Reminder {
   next_due_date: string;
   is_paid: boolean;
   is_variable_amount?: boolean;
+  reminder_days_before?: number;
 }
 
 import AddEmiModal from '@/components/modals/AddEmiModal';
@@ -109,7 +112,56 @@ export default function Dashboard() {
       fetchLoans(user.id);
     };
     checkUser();
+
+    // Request Notification Permission
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
   }, [router, supabase]);
+
+  // Check For Notifications
+  useEffect(() => {
+    const checkReminders = () => {
+      if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') return;
+
+      const allItems = [
+        ...emis.map(e => ({ ...e, type: 'EMI' })),
+        ...insurance.map(i => ({ ...i, type: 'INSURANCE' })),
+        ...reminders.map(r => ({ ...r, type: 'REMINDER' }))
+      ];
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      allItems.forEach((item: any) => {
+        if (item.status === 'CLOSED' || item.is_paid) return;
+
+        const due = new Date(item.next_due_date);
+        due.setHours(0, 0, 0, 0);
+
+        const diffTime = due.getTime() - today.getTime();
+        const daysUntilDue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        const remindDays = item.reminder_days_before || 1; // Default 1 day
+
+        if (daysUntilDue <= remindDays && daysUntilDue >= 0) {
+          // Check if we already notified today (simple local storage check to avoid spam?)
+          // For now, just trigger. Browser often debounce specific tags.
+          new Notification(`Payment Due Soon: ${item.name || item.title}`, {
+            body: `${daysUntilDue === 0 ? 'Due Today' : `Due in ${daysUntilDue} days`}: ${formatCurrency(item.amount || item.premium_amount)}`,
+            icon: '/icon.png', // Placeholder
+            tag: `payment-${item.id}-${new Date().toISOString().split('T')[0]}` // One per day per item
+          });
+        }
+      });
+    };
+
+    // Check immediately and then set interval? Or just check on load.
+    // Checking on load is enough for now. The user will open the app.
+    checkReminders();
+  }, [emis, insurance, reminders]);
 
   const fetchLoans = async (userId: string) => {
     try {
@@ -815,22 +867,11 @@ export default function Dashboard() {
                             {/* Quick Actions Row */}
                             <div className="flex items-center gap-2 mt-1 border-t border-white/5 pt-3">
                               <button
-                                onClick={() => handlePaymentAction(item, item.type, 'snooze')}
-                                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-zinc-800/50 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-medium"
-                              >
-                                <History className="w-3.5 h-3.5" /> Snooze 3d
-                              </button>
-                              <button
-                                onClick={() => handlePaymentAction(item, item.type, 'skip')}
-                                className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-zinc-800/50 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-medium"
-                              >
-                                <SkipForward className="w-3.5 h-3.5" /> Skip
-                              </button>
-                              <button
                                 onClick={() => handlePaymentAction(item, item.type, 'paid')}
                                 className="flex-1 flex items-center justify-center gap-2 p-2 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors text-xs font-bold border border-emerald-500/20"
+                                title="Mark As Paid"
                               >
-                                <Check className="w-3.5 h-3.5" /> Pay Now
+                                <Check className="w-3.5 h-3.5" /> Mark Paid
                               </button>
                             </div>
                           </div>
@@ -1003,13 +1044,6 @@ export default function Dashboard() {
                             <div className="text-white font-mono">{formatCurrency(pol.premium_amount)}</div>
                             <div className="text-xs text-zinc-500 mb-2">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
                             <div className="flex gap-2 justify-end">
-                              <button
-                                onClick={() => handlePaymentAction(pol, 'INSURANCE', 'skip')}
-                                className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
-                                title="Skip (Advance Date)"
-                              >
-                                <SkipForward className="w-3 h-3" />
-                              </button>
                               <button
                                 onClick={() => handlePaymentAction(pol, 'INSURANCE', 'paid')}
                                 className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"

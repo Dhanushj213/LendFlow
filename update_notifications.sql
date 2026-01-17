@@ -1,0 +1,3 @@
+ALTER TABLE emis ADD COLUMN IF NOT EXISTS reminder_days_before INTEGER DEFAULT 1;
+ALTER TABLE insurance_policies ADD COLUMN IF NOT EXISTS reminder_days_before INTEGER DEFAULT 1;
+ALTER TABLE reminders ADD COLUMN IF NOT EXISTS reminder_days_before INTEGER DEFAULT 1;

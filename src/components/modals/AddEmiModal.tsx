@@ -18,7 +18,8 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
         interest_rate: '',
         tenure_months: '',
         start_date: new Date().toISOString().split('T')[0],
-        manual_emi: ''
+        manual_emi: '',
+        reminder_days_before: '1'
     });
 
     // Populate form on edit
@@ -31,10 +32,9 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 interest_rate: initialData.interest_rate?.toString() || '',
                 tenure_months: initialData.tenure_months?.toString() || '',
                 start_date: initialData.start_date,
-                manual_emi: '' // Assuming calculated for now, or could store manual flag
+                manual_emi: '',
+                reminder_days_before: initialData.reminder_days_before?.toString() || '1'
             });
-            // If it was auto-calculated, we rely on the effect to recalc. If it was manual, we might need a flag.
-            // For simplicity, re-triggering calculation logic via effect.
         } else {
             // Reset on Open New
             setForm({
@@ -44,7 +44,8 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 interest_rate: '',
                 tenure_months: '',
                 start_date: new Date().toISOString().split('T')[0],
-                manual_emi: ''
+                manual_emi: '',
+                reminder_days_before: '1'
             });
         }
     }, [initialData, isOpen]);
@@ -94,7 +95,8 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 remaining_months: parseInt(form.tenure_months) || 0, // Initial assumption
                 start_date: form.start_date,
                 next_due_date: nextDueDate.toISOString().split('T')[0],
-                status: 'ACTIVE'
+                status: 'ACTIVE',
+                reminder_days_before: parseInt(form.reminder_days_before) || 1
             };
 
             let error;
@@ -105,14 +107,13 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                     .from('emis')
                     .update({
                         ...payload,
-                        // Don't reset remaining_months or next_due_date on simple edit unless logic demands
-                        // For now, updating basic details. If amount/tenure changes, might need complex logic.
-                        // Simplified: Update description fields.
+                        // Update specific fields on edit
                         name: form.name,
                         lender: form.lender,
                         amount: emiAmount,
                         interest_rate: parseFloat(form.interest_rate) || 0,
-                        tenure_months: parseInt(form.tenure_months) || 0
+                        tenure_months: parseInt(form.tenure_months) || 0,
+                        reminder_days_before: parseInt(form.reminder_days_before) || 1
                     })
                     .eq('id', initialData.id);
                 error = updateError;
@@ -133,7 +134,8 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                 interest_rate: '',
                 tenure_months: '',
                 start_date: new Date().toISOString().split('T')[0],
-                manual_emi: ''
+                manual_emi: '',
+                reminder_days_before: '1'
             });
         } catch (e) {
             console.error(e);
@@ -220,6 +222,18 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }:
                                 onChange={e => setForm({ ...form, tenure_months: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Remind me before (Days)</label>
+                        <input
+                            type="number"
+                            placeholder="1"
+                            min="0"
+                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                            value={form.reminder_days_before}
+                            onChange={e => setForm({ ...form, reminder_days_before: e.target.value })}
+                        />
                     </div>
 
                     {/* Calculated EMI Display */}

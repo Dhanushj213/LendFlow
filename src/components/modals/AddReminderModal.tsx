@@ -15,7 +15,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
         title: '',
         amount: '',
         frequency: 'MONTHLY',
-        next_due_date: new Date().toISOString().split('T')[0]
+        next_due_date: new Date().toISOString().split('T')[0],
+        reminder_days_before: '1'
     });
 
     useEffect(() => {
@@ -24,14 +25,16 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 title: initialData.title,
                 amount: initialData.amount.toString(),
                 frequency: initialData.frequency,
-                next_due_date: initialData.next_due_date
+                next_due_date: initialData.next_due_date,
+                reminder_days_before: initialData.reminder_days_before?.toString() || '1'
             });
         } else {
             setForm({
                 title: '',
                 amount: '',
                 frequency: 'MONTHLY',
-                next_due_date: new Date().toISOString().split('T')[0]
+                next_due_date: new Date().toISOString().split('T')[0],
+                reminder_days_before: '1'
             });
         }
     }, [initialData, isOpen]);
@@ -52,7 +55,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 amount: parseFloat(form.amount),
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
-                is_paid: false
+                is_paid: false,
+                reminder_days_before: parseInt(form.reminder_days_before) || 1
             };
 
             let error;
@@ -76,7 +80,8 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                 title: '',
                 amount: '',
                 frequency: 'MONTHLY',
-                next_due_date: new Date().toISOString().split('T')[0]
+                next_due_date: new Date().toISOString().split('T')[0],
+                reminder_days_before: '1'
             });
         } catch (e) {
             console.error(e);
@@ -142,6 +147,18 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess, initialDa
                             className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
                             value={form.next_due_date}
                             onChange={e => setForm({ ...form, next_due_date: e.target.value })}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Remind me before (Days)</label>
+                        <input
+                            type="number"
+                            placeholder="1"
+                            min="0"
+                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                            value={form.reminder_days_before}
+                            onChange={e => setForm({ ...form, reminder_days_before: e.target.value })}
                         />
                     </div>
                 </div>

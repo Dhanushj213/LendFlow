@@ -17,7 +17,8 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
         premium_amount: '',
         frequency: 'YEARLY',
         next_due_date: new Date().toISOString().split('T')[0],
-        policy_number: ''
+        policy_number: '',
+        reminder_days_before: '1'
     });
 
     useEffect(() => {
@@ -28,7 +29,8 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: initialData.premium_amount.toString(),
                 frequency: initialData.frequency,
                 next_due_date: initialData.next_due_date,
-                policy_number: initialData.policy_number || ''
+                policy_number: initialData.policy_number || '',
+                reminder_days_before: initialData.reminder_days_before?.toString() || '1'
             });
         } else {
             setForm({
@@ -37,7 +39,8 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: '',
                 frequency: 'YEARLY',
                 next_due_date: new Date().toISOString().split('T')[0],
-                policy_number: ''
+                policy_number: '',
+                reminder_days_before: '1'
             });
         }
     }, [initialData, isOpen]);
@@ -59,7 +62,8 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: parseFloat(form.premium_amount),
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
-                policy_number: form.policy_number
+                policy_number: form.policy_number,
+                reminder_days_before: parseInt(form.reminder_days_before) || 1
             };
 
             let error;
@@ -85,7 +89,8 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                 premium_amount: '',
                 frequency: 'YEARLY',
                 next_due_date: new Date().toISOString().split('T')[0],
-                policy_number: ''
+                policy_number: '',
+                reminder_days_before: '1'
             });
         } catch (e) {
             console.error(e);
@@ -174,6 +179,18 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialD
                                 onChange={e => setForm({ ...form, policy_number: e.target.value })}
                             />
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-xs text-zinc-400 block mb-1">Remind me before (Days)</label>
+                        <input
+                            type="number"
+                            placeholder="1"
+                            min="0"
+                            className="w-full bg-black border border-zinc-800 rounded-lg p-3 text-white focus:border-emerald-500 outline-none"
+                            value={form.reminder_days_before}
+                            onChange={e => setForm({ ...form, reminder_days_before: e.target.value })}
+                        />
                     </div>
                 </div>
 
