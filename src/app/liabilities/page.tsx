@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown } from 'lucide-react';
+import { Wallet, Plus, Trash2, AlertCircle, ArrowLeft, Calendar, Edit2, CheckCircle, TrendingDown, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface Liability {
