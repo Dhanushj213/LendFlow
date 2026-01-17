@@ -3,11 +3,12 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { Lock, Mail } from 'lucide-react'
+import { Lock, Mail, Users } from 'lucide-react'
 
 export default function AuthPage() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [username, setUsername] = useState('')
     const [loading, setLoading] = useState(false)
     const [mode, setMode] = useState<'signin' | 'signup'>('signin')
     const router = useRouter()
@@ -24,8 +25,8 @@ export default function AuthPage() {
                     password,
                     options: {
                         data: {
-                            full_name: email.split('@')[0], // Default name
-                            username: email.split('@')[0],
+                            full_name: username, // storing username as full_name for simplicity or custom field
+                            username: username,
                         },
                     },
                 })
@@ -85,6 +86,23 @@ export default function AuthPage() {
                             />
                         </div>
                     </div>
+
+                    {mode === 'signup' && (
+                        <div>
+                            <label className="block text-sm font-medium text-zinc-400 mb-1">Username</label>
+                            <div className="relative">
+                                <Users className="absolute left-3 top-2.5 h-5 w-5 text-zinc-500" />
+                                <input
+                                    type="text"
+                                    required
+                                    className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2.5 pl-10 px-4 text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all"
+                                    placeholder="johndoe"
+                                    value={username}
+                                    onChange={(e) => setUsername(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
 
                     <button
                         type="submit"

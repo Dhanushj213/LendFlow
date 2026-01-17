@@ -105,6 +105,7 @@ export default function Dashboard() {
   const [hideAmounts, setHideAmounts] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [lastActionSnapshot, setLastActionSnapshot] = useState<{ table: string, id: string, data: any } | null>(null);
+  const [userName, setUserName] = useState('');
 
   const router = useRouter();
   const supabase = createClient();
@@ -116,6 +117,10 @@ export default function Dashboard() {
         router.push('/auth');
         return;
       }
+      // Get username from metadata
+      const name = user.user_metadata?.full_name || user.user_metadata?.username || user.email?.split('@')[0] || 'User';
+      setUserName(name);
+
       fetchLoans(user.id);
     };
     checkUser();
@@ -579,7 +584,9 @@ export default function Dashboard() {
                 priority
               />
             </div>
-            <p className="text-zinc-400 text-sm">Portfolio Overview</p>
+            <p className="text-zinc-400 text-sm">
+              Hi <span className="text-white font-medium">{userName}</span>, here is your Portfolio Overview
+            </p>
           </div>
 
           {/* View Toggle */}
@@ -1362,13 +1369,14 @@ export default function Dashboard() {
         />
         <AddReminderModal
           isOpen={showReminderModal}
-          onClose={() => { setShowReminderModal(false); setEditingReminder(undefined); }}
-          onSuccess={async () => {
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user) fetchLoans(user.id);
-          }}
+          onClose={() => setShowReminderModal(false)}
+          onSuccess={() => fetchLoans((supabase.auth.getUser() as any).data?.user?.id)}
           initialData={editingReminder}
         />
+
+        <footer className="text-center text-zinc-600 text-[10px] uppercase tracking-widest py-8">
+          BY DHANUSH J
+        </footer>
       </div >
     </main >
   );
