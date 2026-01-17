@@ -84,9 +84,7 @@ export default function Dashboard() {
   const [showReminderModal, setShowReminderModal] = useState(false);
 
   // Payment Confirmation State
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentItem, setPaymentItem] = useState<any>(null);
-  const [paymentCategory, setPaymentCategory] = useState<'EMI' | 'INSURANCE' | 'REMINDER'>('EMI');
+
 
   // Edit States
   const [editingEmi, setEditingEmi] = useState<EMI | undefined>(undefined);
@@ -1389,7 +1387,7 @@ export default function Dashboard() {
           onClose={() => setShowPaymentModal(false)}
           onConfirm={handleConfirmPayment}
           item={paymentItem}
-          type={paymentCategory}
+          category={paymentCategory}
         />
 
         <footer className="text-center text-zinc-600 text-[10px] uppercase tracking-widest py-8">
