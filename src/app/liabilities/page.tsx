@@ -426,21 +426,12 @@ export default function Liabilities() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* View Toggles */}
+                        {/* View Toggles - Removed as we now auto-group */}
+                        {/* 
                         <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-1 flex">
-                            <button
-                                onClick={() => setViewMode('list')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'list' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
-                            >
-                                List
-                            </button>
-                            <button
-                                onClick={() => setViewMode('groups')}
-                                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${viewMode === 'groups' ? 'bg-zinc-800 text-white' : 'text-zinc-500'}`}
-                            >
-                                Grouped
-                            </button>
-                        </div>
+                            ...
+                        </div> 
+                        */}
 
                         {selectedIds.length > 0 && (
                             <button
@@ -642,7 +633,7 @@ export default function Liabilities() {
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-12 text-zinc-500">Loading liabilities...</div>
-                    ) : filteredLiabilities.length === 0 ? (
+                    ) : groupedLiabilities.length === 0 ? (
                         <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
                             No {statusTab.toLowerCase()} liabilities.
                             {/* Shortuct to add if nothing exists */}
@@ -651,120 +642,102 @@ export default function Liabilities() {
                             )}
                         </div>
                     ) : (
-                        viewMode === 'list' ? (
-                            // LIST VIEW
-                            filteredLiabilities.map(l => (
-                                <div key={l.id} className={`glass-panel p-6 rounded-xl hover:border-red-500/30 transition-colors group relative ${selectedIds.includes(l.id) ? 'border-emerald-500/50 bg-emerald-900/10' : ''}`}>
-                                    {/* Selection Checkbox */}
-                                    {selectedIds.length > 0 || viewMode === 'list' ? (
-                                        <div className="absolute top-4 left-4 z-10">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedIds.includes(l.id)}
-                                                onChange={() => toggleSelection(l.id)}
-                                                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500 mb-4"
-                                            />
-                                        </div>
-                                    ) : null}
-
-                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
-                                        <div className="flex-1">
-                                            <h3 className="text-lg font-medium text-white flex items-center gap-2">
-                                                {(l as any).title || l.lender_name}
-                                                {(l as any).title && (
-                                                    <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 text-xs border border-zinc-700">
-                                                        Group: {l.lender_name}
-                                                    </span>
-                                                )}
+                        // UNIFIED GROUPED CARD VIEW
+                        groupedLiabilities.map((g: any, idx) => (
+                            <div key={idx} className="glass-panel p-0 rounded-xl hover:border-red-500/30 transition-colors overflow-hidden">
+                                {/* Group Header */}
+                                <div className="p-6 border-b border-zinc-800/50 bg-zinc-900/20">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                                                {g.name}
+                                                <span className="text-xs font-normal px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                                    {g.items.length} Component{g.items.length !== 1 ? 's' : ''}
+                                                </span>
                                             </h3>
-                                            <div className="flex items-center gap-3 mt-1 text-sm text-zinc-400">
-                                                <span className="px-2 py-0.5 rounded bg-zinc-800 border border-zinc-700 text-xs text-white">
-                                                    {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
-                                                </span>
-                                                <span className="flex items-center gap-1 text-xs">
-                                                    <Calendar className="w-3 h-3" /> Since {new Date(l.start_date).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                                            {l.status === 'ACTIVE' && (
-                                                <button
-                                                    onClick={(e) => handleRepayClick(l.id, e)}
-                                                    className="p-2 bg-emerald-900/20 text-emerald-500 rounded-lg hover:bg-emerald-900/40 transition-colors text-xs font-medium flex items-center gap-1"
-                                                >
-                                                    <TrendingDown className="w-3 h-3" /> Repay
-                                                </button>
-                                            )}
-                                            <button
-                                                onClick={(e) => handleToggleStatus(l.id, l.status, e)}
-                                                className={`p-2 rounded-lg font-medium text-xs flex items-center gap-1 ${l.status === 'ACTIVE' ? 'text-zinc-400 bg-zinc-800 hover:text-white hover:bg-zinc-700' : 'text-emerald-500 bg-emerald-900/20'}`}
-                                                title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
-                                            >
-                                                <CheckCircle className="w-3 h-3" /> {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
-                                            </button>
-                                            <button onClick={() => handleEditClick(l)} className="p-2 text-zinc-400 hover:text-white bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"><Edit2 className="w-3 h-3" /></button>
-                                            <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-2 text-zinc-400 hover:text-red-500 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"><Trash2 className="w-3 h-3" /></button>
-                                        </div>
-                                    </div>
-
-                                    <div className="pl-0 md:pl-0">
-                                        {/* Removed redundant flex header, now using the one above */}
-                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-zinc-800/50 mt-2">
-                                            <div>
-                                                <span className="text-xs text-zinc-500 block mb-1">Principal</span>
-                                                <span className="text-white font-mono text-lg">{formatCurrency(l.principal_amount)}</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-xs text-zinc-500 block mb-1">Total Due (w/ Interest)</span>
-                                                <span className="text-red-400 font-bold font-mono text-lg">{formatCurrency(l.total_due || 0)}</span>
-                                                <div className="text-[10px] text-zinc-600 mt-0.5">Interest: {formatCurrency(l.accrued_interest || 0)}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            // GROUPED VIEW
-                            groupedLiabilities.map((g: any, idx) => (
-                                <div key={idx} className="glass-panel p-6 rounded-xl border-zinc-800">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="p-3 bg-red-900/20 text-red-500 rounded-xl">
-                                                <Wallet className="w-6 h-6" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-xl font-bold text-white">{g.name}</h3>
-                                                <p className="text-zinc-500 text-sm">{g.count} Loans</p>
+                                            <div className="text-xs text-zinc-500 mt-1">
+                                                Total Principal: <span className="text-zinc-300 font-mono">{formatCurrency(g.principal)}</span>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-2xl font-bold text-white">{formatCurrency(g.principal + g.interest)}</div>
-                                            <div className="text-xs text-zinc-500">Total Family Liability</div>
+                                            <div className="text-2xl font-bold text-white font-mono">{formatCurrency(g.principal + g.interest)}</div>
+                                            <div className="text-xs text-zinc-500">Total Due</div>
                                         </div>
                                     </div>
+                                </div>
 
-                                    <div className="space-y-3">
-                                        {g.items.map((l: any) => (
-                                            <div key={l.id} className="bg-black/50 border border-zinc-800 p-4 rounded-lg flex justify-between items-center">
-                                                <div>
-                                                    <div className="text-sm text-white font-medium">
-                                                        {(l as any).title || 'Untitled Portfolio'}
-                                                    </div>
-                                                    <div className="text-xs text-zinc-500">
-                                                        {formatCurrency(l.principal_amount)} @ {(l.interest_rate * 100).toFixed(2)}%
+                                {/* Items List */}
+                                <div className="divide-y divide-zinc-800/50">
+                                    {g.items.map((l: Liability) => (
+                                        <div key={l.id} className={`p-4 hover:bg-zinc-900/30 transition-colors relative group ${selectedIds.includes(l.id) ? 'bg-emerald-900/10' : ''}`}>
+                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                {/* Left: Info */}
+                                                <div className="flex items-start gap-3">
+                                                    {/* Selection Checkbox (Nested) */}
+                                                    {(selectedIds.length > 0) && (
+                                                        <div className="pt-1">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedIds.includes(l.id)}
+                                                                onChange={() => toggleSelection(l.id)}
+                                                                className="w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium text-white">{l.title || 'Principal Loan'}</span>
+                                                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700">
+                                                                {(l.interest_rate * 100).toFixed(2)}% {l.rate_interval}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                                                            <span>Principal: {formatCurrency(l.principal_amount)}</span>
+                                                            <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                                                            <span>Interest: <span className="text-red-400">{formatCurrency(l.accrued_interest || 0)}</span></span>
+                                                            <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                                                            <span>Since {new Date(l.start_date).toLocaleDateString()}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="text-right">
-                                                    <div className="text-sm font-bold text-red-400">{formatCurrency(l.accrued_interest)}</div>
-                                                    <div className="text-[10px] text-zinc-600">Interest</div>
+
+                                                {/* Right: Actions */}
+                                                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                                                    <span className="text-sm font-bold text-zinc-300 font-mono md:hidden">
+                                                        {formatCurrency(l.total_due || 0)}
+                                                    </span>
+
+                                                    <div className="flex items-center gap-1 opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {l.status === 'ACTIVE' && (
+                                                            <button
+                                                                onClick={(e) => handleRepayClick(l.id, e)}
+                                                                className="p-1.5 bg-emerald-900/20 text-emerald-500 rounded hover:bg-emerald-900/40 transition-colors text-[10px] font-medium flex items-center gap-1"
+                                                            >
+                                                                Repay
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={(e) => handleToggleStatus(l.id, l.status, e)}
+                                                            className={`p-1.5 rounded hover:bg-zinc-700 transition-colors text-[10px] font-medium flex items-center gap-1 ${l.status === 'ACTIVE' ? 'text-zinc-400' : 'text-emerald-500'}`}
+                                                            title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
+                                                        >
+                                                            {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
+                                                        </button>
+                                                        <button onClick={() => handleEditClick(l)} className="p-1.5 text-zinc-500 hover:text-white rounded hover:bg-zinc-800"><Edit2 className="w-3 h-3" /></button>
+                                                        <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-1.5 text-zinc-500 hover:text-red-500 rounded hover:bg-zinc-800"><Trash2 className="w-3 h-3" /></button>
+                                                    </div>
+
+                                                    <div className="hidden md:block text-right min-w-[100px]">
+                                                        <div className="text-sm font-bold text-zinc-300 font-mono">{formatCurrency(l.total_due || 0)}</div>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))
-                        )
+                            </div>
+                        ))
                     )}
                 </div>
             </div>
