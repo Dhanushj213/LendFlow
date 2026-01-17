@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import Image from 'next/image';
 import { Wallet, TrendingUp, Plus, ArrowRight, History, Calendar, Calculator, Users, Merge, Check, X, Menu, ArrowDownLeft } from 'lucide-react';
 
 interface Transaction {
