@@ -69,36 +69,44 @@ export default function MonthlyFinancialSnapshot({ emis, insurance, reminders }:
 
     return (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2">
-                    <Calendar className="w-4 h-4 text-zinc-500" /> Due This Month
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between overflow-hidden">
+                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2 truncate">
+                    <Calendar className="w-4 h-4 text-zinc-500 shrink-0" /> Due This Month
                 </div>
-                <div className="text-2xl font-bold text-white">{formatCurrency(totalDueMonth)}</div>
+                <div className="text-lg md:text-2xl font-bold text-white truncate" title={formatCurrency(totalDueMonth)}>
+                    {formatCurrency(totalDueMonth)}
+                </div>
             </div>
 
             <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between relative overflow-hidden">
                 {totalOverdue > 0 && <div className="absolute inset-0 bg-red-500/5 animate-pulse" />}
-                <div className="flex items-center gap-2 text-red-400 text-xs font-medium uppercase tracking-wider mb-2 z-10">
-                    <AlertTriangle className="w-4 h-4" /> Overdue
+                <div className="flex items-center gap-2 text-red-400 text-xs font-medium uppercase tracking-wider mb-2 z-10 truncate">
+                    <AlertTriangle className="w-4 h-4 shrink-0" /> Overdue
                 </div>
-                <div className="text-2xl font-bold text-red-500 z-10">{formatCurrency(totalOverdue)}</div>
+                <div className="text-lg md:text-2xl font-bold text-red-500 z-10 truncate" title={formatCurrency(totalOverdue)}>
+                    {formatCurrency(totalOverdue)}
+                </div>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2">
-                    <ArrowUpRight className="w-4 h-4 text-zinc-500" /> Largest Payment
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between overflow-hidden">
+                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2 truncate">
+                    <ArrowUpRight className="w-4 h-4 text-zinc-500 shrink-0" /> Largest Payment
                 </div>
-                <div>
-                    <div className="text-xl font-bold text-white">{formatCurrency(largestPayment.amount)}</div>
+                <div className="min-w-0">
+                    <div className="text-lg md:text-xl font-bold text-white truncate" title={formatCurrency(largestPayment.amount)}>
+                        {formatCurrency(largestPayment.amount)}
+                    </div>
                     <div className="text-xs text-zinc-500 truncate mt-1">{largestPayment.name || '-'}</div>
                 </div>
             </div>
 
-            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between">
-                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2">
-                    <Wallet className="w-4 h-4 text-zinc-500" /> Year Remaining
+            <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl flex flex-col justify-between overflow-hidden">
+                <div className="flex items-center gap-2 text-zinc-400 text-xs font-medium uppercase tracking-wider mb-2 truncate">
+                    <Wallet className="w-4 h-4 text-zinc-500 shrink-0" /> Year Remaining
                 </div>
-                <div className="text-2xl font-bold text-emerald-500">{formatCurrency(remainingYearlyCommitment)}</div>
+                <div className="text-lg md:text-2xl font-bold text-emerald-500 truncate" title={formatCurrency(remainingYearlyCommitment)}>
+                    {formatCurrency(remainingYearlyCommitment)}
+                </div>
             </div>
         </div>
     );
