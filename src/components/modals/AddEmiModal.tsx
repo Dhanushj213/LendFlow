@@ -6,9 +6,10 @@ interface AddEmiModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
 }
 
-export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalProps) {
+export default function AddEmiModal({ isOpen, onClose, onSuccess, initialData }: AddEmiModalProps) {
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         name: '',
@@ -19,6 +20,34 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalP
         start_date: new Date().toISOString().split('T')[0],
         manual_emi: ''
     });
+
+    // Populate form on edit
+    useEffect(() => {
+        if (initialData) {
+            setForm({
+                name: initialData.name,
+                lender: initialData.lender,
+                amount: initialData.amount.toString(),
+                interest_rate: initialData.interest_rate?.toString() || '',
+                tenure_months: initialData.tenure_months?.toString() || '',
+                start_date: initialData.start_date,
+                manual_emi: '' // Assuming calculated for now, or could store manual flag
+            });
+            // If it was auto-calculated, we rely on the effect to recalc. If it was manual, we might need a flag.
+            // For simplicity, re-triggering calculation logic via effect.
+        } else {
+            // Reset on Open New
+            setForm({
+                name: '',
+                lender: '',
+                amount: '',
+                interest_rate: '',
+                tenure_months: '',
+                start_date: new Date().toISOString().split('T')[0],
+                manual_emi: ''
+            });
+        }
+    }, [initialData, isOpen]);
 
     const [calculatedEmi, setCalculatedEmi] = useState<number | null>(null);
 
@@ -55,7 +84,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalP
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not found");
 
-            const { error } = await supabase.from('emis').insert({
+            const payload = {
                 user_id: user.id,
                 name: form.name,
                 lender: form.lender,
@@ -66,7 +95,32 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalP
                 start_date: form.start_date,
                 next_due_date: nextDueDate.toISOString().split('T')[0],
                 status: 'ACTIVE'
-            });
+            };
+
+            let error;
+
+            if (initialData) {
+                // Update
+                const { error: updateError } = await supabase
+                    .from('emis')
+                    .update({
+                        ...payload,
+                        // Don't reset remaining_months or next_due_date on simple edit unless logic demands
+                        // For now, updating basic details. If amount/tenure changes, might need complex logic.
+                        // Simplified: Update description fields.
+                        name: form.name,
+                        lender: form.lender,
+                        amount: emiAmount,
+                        interest_rate: parseFloat(form.interest_rate) || 0,
+                        tenure_months: parseInt(form.tenure_months) || 0
+                    })
+                    .eq('id', initialData.id);
+                error = updateError;
+            } else {
+                // Insert
+                const { error: insertError } = await supabase.from('emis').insert(payload);
+                error = insertError;
+            }
 
             if (error) throw error;
             onSuccess();
@@ -95,7 +149,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalP
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-white">Add New EMI</h3>
+                    <h3 className="text-xl font-bold text-white">{initialData ? 'Edit EMI' : 'Add New EMI'}</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white">
                         <X className="w-6 h-6" />
                     </button>
@@ -202,7 +256,7 @@ export default function AddEmiModal({ isOpen, onClose, onSuccess }: AddEmiModalP
                     disabled={loading}
                     className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
                 >
-                    {loading ? 'Adding...' : 'Add EMI'}
+                    {loading ? 'Saving...' : (initialData ? 'Update EMI' : 'Add EMI')}
                 </button>
             </div>
         </div>

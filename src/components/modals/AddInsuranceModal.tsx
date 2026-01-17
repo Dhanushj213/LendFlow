@@ -6,9 +6,10 @@ interface AddInsuranceModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
 }
 
-export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddInsuranceModalProps) {
+export default function AddInsuranceModal({ isOpen, onClose, onSuccess, initialData }: AddInsuranceModalProps) {
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         name: '',
@@ -18,6 +19,28 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddIns
         next_due_date: new Date().toISOString().split('T')[0],
         policy_number: ''
     });
+
+    useEffect(() => {
+        if (initialData) {
+            setForm({
+                name: initialData.name,
+                provider: initialData.provider || '',
+                premium_amount: initialData.premium_amount.toString(),
+                frequency: initialData.frequency,
+                next_due_date: initialData.next_due_date,
+                policy_number: initialData.policy_number || ''
+            });
+        } else {
+            setForm({
+                name: '',
+                provider: '',
+                premium_amount: '',
+                frequency: 'YEARLY',
+                next_due_date: new Date().toISOString().split('T')[0],
+                policy_number: ''
+            });
+        }
+    }, [initialData, isOpen]);
 
     const supabase = createClient();
 
@@ -29,7 +52,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddIns
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not found");
 
-            const { error } = await supabase.from('insurance_policies').insert({
+            const payload = {
                 user_id: user.id,
                 name: form.name,
                 provider: form.provider,
@@ -37,7 +60,21 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddIns
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
                 policy_number: form.policy_number
-            });
+            };
+
+            let error;
+            if (initialData) {
+                const { error: updateError } = await supabase
+                    .from('insurance_policies')
+                    .update(payload)
+                    .eq('id', initialData.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('insurance_policies')
+                    .insert(payload);
+                error = insertError;
+            }
 
             if (error) throw error;
             onSuccess();
@@ -64,7 +101,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddIns
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-white">Add Insurance Policy</h3>
+                    <h3 className="text-xl font-bold text-white">{initialData ? 'Edit Policy' : 'Add Insurance Policy'}</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white">
                         <X className="w-6 h-6" />
                     </button>
@@ -145,7 +182,7 @@ export default function AddInsuranceModal({ isOpen, onClose, onSuccess }: AddIns
                     disabled={loading}
                     className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
                 >
-                    {loading ? 'Adding...' : 'Add Policy'}
+                    {loading ? 'Saving...' : (initialData ? 'Update Policy' : 'Add Policy')}
                 </button>
             </div>
         </div>

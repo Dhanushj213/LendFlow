@@ -6,9 +6,10 @@ interface AddReminderModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    initialData?: any;
 }
 
-export default function AddReminderModal({ isOpen, onClose, onSuccess }: AddReminderModalProps) {
+export default function AddReminderModal({ isOpen, onClose, onSuccess, initialData }: AddReminderModalProps) {
     const [loading, setLoading] = useState(false);
     const [form, setForm] = useState({
         title: '',
@@ -16,6 +17,24 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess }: AddRemi
         frequency: 'MONTHLY',
         next_due_date: new Date().toISOString().split('T')[0]
     });
+
+    useEffect(() => {
+        if (initialData) {
+            setForm({
+                title: initialData.title,
+                amount: initialData.amount.toString(),
+                frequency: initialData.frequency,
+                next_due_date: initialData.next_due_date
+            });
+        } else {
+            setForm({
+                title: '',
+                amount: '',
+                frequency: 'MONTHLY',
+                next_due_date: new Date().toISOString().split('T')[0]
+            });
+        }
+    }, [initialData, isOpen]);
 
     const supabase = createClient();
 
@@ -27,14 +46,28 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess }: AddRemi
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("User not found");
 
-            const { error } = await supabase.from('reminders').insert({
+            const payload = {
                 user_id: user.id,
                 title: form.title,
                 amount: parseFloat(form.amount),
                 frequency: form.frequency,
                 next_due_date: form.next_due_date,
                 is_paid: false
-            });
+            };
+
+            let error;
+            if (initialData) {
+                const { error: updateError } = await supabase
+                    .from('reminders')
+                    .update(payload)
+                    .eq('id', initialData.id);
+                error = updateError;
+            } else {
+                const { error: insertError } = await supabase
+                    .from('reminders')
+                    .insert(payload);
+                error = insertError;
+            }
 
             if (error) throw error;
             onSuccess();
@@ -59,7 +92,7 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess }: AddRemi
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-md p-6" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-white">Add Reminder</h3>
+                    <h3 className="text-xl font-bold text-white">{initialData ? 'Edit Reminder' : 'Add Reminder'}</h3>
                     <button onClick={onClose} className="text-zinc-500 hover:text-white">
                         <X className="w-6 h-6" />
                     </button>
@@ -118,7 +151,7 @@ export default function AddReminderModal({ isOpen, onClose, onSuccess }: AddRemi
                     disabled={loading}
                     className="w-full mt-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all disabled:opacity-50"
                 >
-                    {loading ? 'Adding...' : 'Add Reminder'}
+                    {loading ? 'Saving...' : (initialData ? 'Update Reminder' : 'Add Reminder')}
                 </button>
             </div>
         </div>
