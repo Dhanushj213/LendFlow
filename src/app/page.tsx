@@ -66,6 +66,8 @@ interface Reminder {
 import AddEmiModal from '@/components/modals/AddEmiModal';
 import AddInsuranceModal from '@/components/modals/AddInsuranceModal';
 import AddReminderModal from '@/components/modals/AddReminderModal';
+import PaymentConfirmationModal from '@/components/modals/PaymentConfirmationModal';
+import MonthlyFinancialSnapshot from '@/components/MonthlyFinancialSnapshot';
 
 export default function Dashboard() {
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -80,6 +82,11 @@ export default function Dashboard() {
   const [showEmiModal, setShowEmiModal] = useState(false);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
+
+  // Payment Confirmation State
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentItem, setPaymentItem] = useState<any>(null);
+  const [paymentCategory, setPaymentCategory] = useState<'EMI' | 'INSURANCE' | 'REMINDER'>('EMI');
 
   // Edit States
   const [editingEmi, setEditingEmi] = useState<EMI | undefined>(undefined);
@@ -343,121 +350,133 @@ export default function Dashboard() {
     };
   };
 
-  const handlePaymentAction = async (item: any, type: 'EMI' | 'INSURANCE' | 'REMINDER', action: 'paid' | 'skip' | 'snooze') => {
+  // Payment Logic
+  const initiatePayment = (item: any, category: 'EMI' | 'INSURANCE' | 'REMINDER') => {
+    setPaymentItem(item);
+    setPaymentCategory(category);
+    setShowPaymentModal(true);
+  };
 
-    // SNOOZE LOGIC: Just delay the current due date, don't advance the cycle
-    if (action === 'snooze') {
-      const currentDue = new Date(item.next_due_date);
-      currentDue.setDate(currentDue.getDate() + 3); // Snooze for 3 days
+  const handleConfirmPayment = async (details: { payment_date: string, amount: number, payment_mode: string }) => {
+    if (!paymentItem) return;
 
-      const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
-      const { error } = await supabase
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not found");
+
+      // 1. Record History
+      const { error: historyError } = await supabase.from('payment_history').insert({
+        user_id: user.id,
+        amount: details.amount,
+        payment_date: details.payment_date,
+        payment_mode: details.payment_mode,
+        category: paymentCategory,
+        reference_id: paymentItem.id
+      });
+      if (historyError) throw historyError;
+
+      // 2. Calculate Next Due Date & Status Updates
+      const currentDue = new Date(paymentItem.next_due_date);
+      let nextDue = new Date(currentDue);
+      let updates: any = {};
+      let table = '';
+
+      if (paymentCategory === 'EMI') {
+        table = 'emis';
+        // Logic: +1 Month
+        nextDue.setMonth(nextDue.getMonth() + 1);
+        updates.next_due_date = nextDue.toISOString().split('T')[0];
+
+        // Decrement remaining months
+        const newRemaining = Math.max(0, paymentItem.remaining_months - 1);
+        updates.remaining_months = newRemaining;
+
+        if (newRemaining === 0) {
+          updates.status = 'CLOSED';
+        }
+      }
+      else if (paymentCategory === 'INSURANCE') {
+        table = 'insurance_policies';
+        // Logic: +Frequency
+        if (paymentItem.frequency === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
+        else if (paymentItem.frequency === 'QUARTERLY') nextDue.setMonth(nextDue.getMonth() + 3);
+        else if (paymentItem.frequency === 'HALF_YEARLY') nextDue.setMonth(nextDue.getMonth() + 6);
+        else if (paymentItem.frequency === 'YEARLY') nextDue.setFullYear(nextDue.getFullYear() + 1);
+
+        updates.next_due_date = nextDue.toISOString().split('T')[0];
+      }
+      else if (paymentCategory === 'REMINDER') {
+        table = 'reminders';
+        if (paymentItem.frequency === 'ONE_TIME') {
+          updates.is_paid = true;
+        } else {
+          // Auto regenerate next date
+          if (paymentItem.frequency === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
+          else if (paymentItem.frequency === 'YEARLY') nextDue.setFullYear(nextDue.getFullYear() + 1);
+
+          updates.next_due_date = nextDue.toISOString().split('T')[0];
+          updates.is_paid = false; // Reset paid status for next cycle
+        }
+      }
+
+      // 3. Update Item
+      // Save snapshot for undo
+      setLastActionSnapshot({ table, id: paymentItem.id, data: { ...paymentItem } });
+      setShowUndo(true);
+      setTimeout(() => setShowUndo(false), 5000);
+
+      const { error: updateError } = await supabase
         .from(table)
-        .update({ next_due_date: currentDue.toISOString() })
-        .eq('id', item.id);
+        .update(updates)
+        .eq('id', paymentItem.id);
 
-      if (error) console.error(`Error snoozing ${type}:`, error);
-      else {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) fetchLoans(user.id);
+      if (updateError) throw updateError;
+
+      // 4. Refresh Data
+      fetchLoans(user.id);
+
+      // 5. Vibration
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate(50);
       }
-      return;
+
+    } catch (e) {
+      console.error("Payment Error", e);
+      alert("Failed to record payment");
     }
-
-    let updates: any = {};
-    const currentDue = new Date(item.next_due_date);
-    let nextDue = new Date(currentDue);
-
-    // Calculate next due date based on frequency/type
-    if (type === 'EMI') {
-      nextDue.setMonth(nextDue.getMonth() + 1);
-    } else if (type === 'INSURANCE') {
-      const freq = item.frequency || 'YEARLY';
-      if (freq === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
-      else if (freq === 'QUARTERLY') nextDue.setMonth(nextDue.getMonth() + 3);
-      else if (freq === 'HALF_YEARLY') nextDue.setMonth(nextDue.getMonth() + 6);
-      else nextDue.setFullYear(nextDue.getFullYear() + 1);
-    } else if (type === 'REMINDER') {
-      if (item.frequency === 'ONE_TIME') {
-        if (action === 'paid') updates.is_paid = true;
-      } else {
-        const freq = item.frequency;
-        if (freq === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
-        else if (freq === 'YEARLY') nextDue.setFullYear(nextDue.getFullYear() + 1);
-      }
-    }
-
-    if (item.frequency !== 'ONE_TIME') {
-      updates.next_due_date = nextDue.toISOString();
-    }
-
-    // Specific logic for EMI (tenure reduction)
-    if (type === 'EMI' && action === 'paid') {
-      updates.remaining_months = Math.max(0, item.remaining_months - 1);
-      if (updates.remaining_months === 0) updates.status = 'CLOSED';
-    }
-
-    // Variable Amount Logic for Reminders
-    if (type === 'REMINDER' && action === 'paid' && item.is_variable_amount) {
-      const actualAmount = prompt(`Confirm actual amount paid for ${item.title}:`, item.amount.toString());
-      if (actualAmount && !isNaN(parseFloat(actualAmount))) {
-        updates.amount = parseFloat(actualAmount);
-      }
-    }
-
-    // UX: Haptics & Snapshot
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(50);
-
-    // Save snapshot used for undo
-    // We assume 'item' contains the original state before this update
-    const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
-    setLastActionSnapshot({
-      table,
-      id: item.id,
-      data: { ...item } // clone
-    });
-
-    // Show Undo Toast
-    setShowUndo(true);
-    setTimeout(() => setShowUndo(false), 5000);
-
-    // Update Database
-    const { error } = await supabase
-      .from(table)
-      .update(updates)
-      .eq('id', item.id);
-
-    if (error) {
-      console.error(`Error updating ${type}:`, error);
-      return;
-    }
-
-    // Refresh Data
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) fetchLoans(user.id);
   };
 
   const handleUndo = async () => {
     if (!lastActionSnapshot) return;
+    try {
+      const { error } = await supabase
+        .from(lastActionSnapshot.table)
+        .update(lastActionSnapshot.data) // Revert to old data
+        .eq('id', lastActionSnapshot.id);
 
-    const { table, id, data } = lastActionSnapshot;
+      if (error) throw error;
 
-    // Haptic
-    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([50, 50, 50]);
-
-    const { error } = await supabase
-      .from(table)
-      .update(data) // Restore all fields
-      .eq('id', id);
-
-    if (error) {
-      console.error("Undo failed:", error);
-      alert("Undo failed");
-    } else {
+      fetchLoans((await supabase.auth.getUser()).data.user!.id);
       setShowUndo(false);
       setLastActionSnapshot(null);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) fetchLoans(user.id);
+
+      if (typeof navigator !== 'undefined' && navigator.vibrate) {
+        navigator.vibrate([50, 50, 50]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Old Payment Handler (Deprecated / simplified to just call initiate)
+  const handlePaymentAction = (item: any, type: string, action: string) => {
+    // This was the old direct handler. We are now routing 'paid' to the new modal.
+    if (action === 'paid') {
+      // Map type string to category enum
+      let cat: any = 'EMI';
+      if (type === 'INSURANCE') cat = 'INSURANCE';
+      if (type === 'REMINDER') cat = 'REMINDER';
+      initiatePayment(item, cat);
     }
   };
 
@@ -782,12 +801,12 @@ export default function Dashboard() {
           <div className="grid gap-4">
             {viewMode === 'emis' && (
               <>
-                {/* Upcoming Payments (Next 30 Days) */}
-                <div className="bg-gradient-to-br from-zinc-900 to-zinc-950 border border-zinc-800 p-6 rounded-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <Calendar className="w-24 h-24 text-emerald-500" />
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-4 relative z-10">Upcoming Payments</h3>
+                {/* Monthly Snapshot */}
+                <MonthlyFinancialSnapshot emis={emis} insurance={insurance} reminders={reminders} />
+
+                {/* Due Soon (Upcoming) */}
+                <div className="mb-6">
+                  <h3 className="text-xl font-bold text-white mb-4">Due Soon</h3>
                   <div className="space-y-3 relative z-10">
                     {(() => {
                       const allItems = [
@@ -1045,7 +1064,7 @@ export default function Dashboard() {
                             <div className="text-xs text-zinc-500 mb-2">Due: {new Date(pol.next_due_date).toLocaleDateString()}</div>
                             <div className="flex gap-2 justify-end">
                               <button
-                                onClick={() => handlePaymentAction(pol, 'INSURANCE', 'paid')}
+                                onClick={() => initiatePayment(pol, 'INSURANCE')}
                                 className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                                 title="Renew Now"
                               >
@@ -1062,7 +1081,7 @@ export default function Dashboard() {
                 {/* Reminders List */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-bold text-white">Other Reminders</h3>
+                    <h3 className="text-xl font-bold text-white">Bills & Subscriptions</h3>
                     <button
                       onClick={() => setShowReminderModal(true)}
                       className="text-xs bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded-lg text-emerald-500 transition-colors"
