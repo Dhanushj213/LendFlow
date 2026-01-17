@@ -188,6 +188,27 @@ export default function Liabilities() {
         }
     };
 
+    const handleToggleStatus = async (id: string, currentStatus: 'ACTIVE' | 'CLOSED', e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const newStatus = currentStatus === 'ACTIVE' ? 'CLOSED' : 'ACTIVE';
+
+        // Optimistic
+        setLiabilities(prev => prev.map(l => l.id === id ? { ...l, status: newStatus } : l));
+
+        try {
+            const { error } = await supabase
+                .from('personal_borrowings')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) throw error;
+        } catch (e) {
+            console.error(e);
+            alert('Error updating status');
+            fetchLiabilities(); // Revert
+        }
+    };
+
     const handleMerge = async () => {
         if (!mergeName.trim() || selectedIds.length === 0) return;
         try {
