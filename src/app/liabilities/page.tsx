@@ -38,6 +38,7 @@ export default function Liabilities() {
     const [mergeName, setMergeName] = useState('');
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [statusTab, setStatusTab] = useState<'ACTIVE' | 'CLOSED'>('ACTIVE');
 
     const [form, setForm] = useState({
         lender_name: '',
@@ -230,11 +231,12 @@ export default function Liabilities() {
     const formatCurrency = (val: number) =>
         new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
 
-    const totalPrincipal = liabilities.reduce((sum, l) => sum + l.principal_amount, 0);
-    const totalInterest = liabilities.reduce((sum, l) => sum + (l.accrued_interest || 0), 0);
+    const filteredLiabilities = liabilities.filter(l => l.status === statusTab);
+    const totalPrincipal = filteredLiabilities.reduce((sum, l) => sum + l.principal_amount, 0);
+    const totalInterest = filteredLiabilities.reduce((sum, l) => sum + (l.accrued_interest || 0), 0);
 
     // Grouping Logic
-    const groupedLiabilities = Object.values(liabilities.reduce((acc, l) => {
+    const groupedLiabilities = Object.values(filteredLiabilities.reduce((acc, l) => {
         if (!acc[l.lender_name]) {
             acc[l.lender_name] = {
                 name: l.lender_name,
@@ -266,7 +268,20 @@ export default function Liabilities() {
                                 <Wallet className="w-8 h-8 text-red-500" />
                                 My Borrowings
                             </h1>
-                            <p className="text-zinc-500 text-sm mt-1">Track funds you have borrowed</p>
+                            <div className="flex items-center gap-4 mt-2">
+                                <button
+                                    onClick={() => setStatusTab('ACTIVE')}
+                                    className={`text-sm font-medium transition-colors ${statusTab === 'ACTIVE' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    Active
+                                </button>
+                                <button
+                                    onClick={() => setStatusTab('CLOSED')}
+                                    className={`text-sm font-medium transition-colors ${statusTab === 'CLOSED' ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    Closed
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -393,12 +408,12 @@ export default function Liabilities() {
                 <div className="space-y-4">
                     {loading ? (
                         <div className="text-center py-12 text-zinc-500">Loading liabilities...</div>
-                    ) : liabilities.length === 0 ? (
-                        <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">No liabilities recorded.</div>
+                    ) : filteredLiabilities.length === 0 ? (
+                        <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">No {statusTab.toLowerCase()} liabilities.</div>
                     ) : (
                         viewMode === 'list' ? (
                             // LIST VIEW
-                            liabilities.map(l => (
+                            filteredLiabilities.map(l => (
                                 <div key={l.id} className={`glass-panel p-6 rounded-xl hover:border-red-500/30 transition-colors group relative ${selectedIds.includes(l.id) ? 'border-emerald-500/50 bg-emerald-900/10' : ''}`}>
                                     {/* Selection Checkbox */}
                                     {selectedIds.length > 0 || viewMode === 'list' ? (
@@ -413,6 +428,13 @@ export default function Liabilities() {
                                     ) : null}
 
                                     <div className="flex justify-end absolute top-4 right-4 gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                            onClick={(e) => handleToggleStatus(l.id, l.status, e)}
+                                            className={`p-2 rounded-lg font-medium text-xs ${l.status === 'ACTIVE' ? 'text-emerald-500 bg-emerald-900/20 hover:bg-emerald-900/40' : 'text-zinc-500 bg-zinc-800 hover:text-white'}`}
+                                            title={l.status === 'ACTIVE' ? "Mark as Closed" : "Reopen"}
+                                        >
+                                            {l.status === 'ACTIVE' ? 'Close' : 'Reopen'}
+                                        </button>
                                         <button onClick={() => handleEditClick(l)} className="p-2 text-zinc-600 hover:text-white bg-zinc-800 rounded-lg font-medium text-xs">Edit</button>
                                         <button onClick={(e) => handleDeleteClick(l.id, e)} className="p-2 text-zinc-600 hover:text-red-500 bg-zinc-800 rounded-lg font-medium text-xs"><Trash2 className="w-3 h-3" /></button>
                                     </div>
