@@ -210,33 +210,54 @@ export default function Dashboard() {
       return sum + l.principal_amount + interest;
     }, 0);
 
-  const handleEmiAction = async (emi: EMI, action: 'paid' | 'skip') => {
-    const nextDueDate = new Date(emi.next_due_date);
-    nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+  const handlePaymentAction = async (item: any, type: 'EMI' | 'INSURANCE' | 'REMINDER', action: 'paid' | 'skip') => {
+    let updates: any = {};
+    const currentDue = new Date(item.next_due_date);
+    let nextDue = new Date(currentDue);
 
-    const updates: any = {
-      next_due_date: nextDueDate.toISOString(),
-      remaining_months: emi.remaining_months
-    };
-
-    if (action === 'paid') {
-      updates.remaining_months = Math.max(0, emi.remaining_months - 1);
-      if (updates.remaining_months === 0) {
-        updates.status = 'CLOSED';
+    // Calculate next due date based on frequency/type
+    if (type === 'EMI') {
+      nextDue.setMonth(nextDue.getMonth() + 1);
+    } else if (type === 'INSURANCE') {
+      const freq = item.frequency || 'YEARLY';
+      if (freq === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
+      else if (freq === 'QUARTERLY') nextDue.setMonth(nextDue.getMonth() + 3);
+      else if (freq === 'HALF_YEARLY') nextDue.setMonth(nextDue.getMonth() + 6);
+      else nextDue.setFullYear(nextDue.getFullYear() + 1);
+    } else if (type === 'REMINDER') {
+      if (item.frequency === 'ONE_TIME') {
+        if (action === 'paid') updates.is_paid = true;
+      } else {
+        const freq = item.frequency;
+        if (freq === 'MONTHLY') nextDue.setMonth(nextDue.getMonth() + 1);
+        else if (freq === 'YEARLY') nextDue.setFullYear(nextDue.getFullYear() + 1);
       }
     }
 
+    if (item.frequency !== 'ONE_TIME') {
+      updates.next_due_date = nextDue.toISOString();
+    }
+
+    // Specific logic for EMI (tenure reduction)
+    if (type === 'EMI' && action === 'paid') {
+      updates.remaining_months = Math.max(0, item.remaining_months - 1);
+      if (updates.remaining_months === 0) updates.status = 'CLOSED';
+    }
+
+    // Update Database
+    const table = type === 'EMI' ? 'emis' : type === 'INSURANCE' ? 'insurance_policies' : 'reminders';
+
     const { error } = await supabase
-      .from('emis')
+      .from(table)
       .update(updates)
-      .eq('id', emi.id);
+      .eq('id', item.id);
 
     if (error) {
-      console.error('Error updating EMI:', error);
-      alert('Failed to update EMI');
+      console.error(`Error updating ${type}:`, error);
       return;
     }
 
+    // Refresh Data
     const { data: { user } } = await supabase.auth.getUser();
     if (user) fetchLoans(user.id);
   };
@@ -246,11 +267,12 @@ export default function Dashboard() {
 
     try {
       setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
 
       // 1. Create New Borrower
       const { data: newBorrower, error: createError } = await supabase
         .from('borrowers')
-        .insert({ name: mergeName, user_id: (await supabase.auth.getUser()).data.user?.id })
+        .insert({ name: mergeName, user_id: user?.id })
         .select()
         .single();
 
@@ -283,7 +305,6 @@ export default function Dashboard() {
       setShowMergeModal(false);
 
       // Refresh
-      const { data: { user } } = await supabase.auth.getUser();
       if (user) fetchLoans(user.id);
 
     } catch (e) {
@@ -368,9 +389,6 @@ export default function Dashboard() {
             </button>
             {viewMode === 'borrowers' && (
               <>
-                <div className="text-white p-8 text-center border border-zinc-800 border-dashed rounded-xl">
-                  Borrower View (Disabled for debugging)
-                </div>
                 <button
                   onClick={() => setShowMergeModal(true)}
                   className="ml-2 px-3 py-1.5 rounded-md text-xs font-medium text-emerald-500 hover:text-emerald-400 hover:bg-zinc-800 transition-all flex items-center gap-2"
@@ -574,9 +592,9 @@ export default function Dashboard() {
                   <div className="space-y-3 relative z-10">
                     {(() => {
                       const allItems = [
-                        ...emis.filter(e => e.status === 'ACTIVE').map(e => ({ ...e, type: 'EMI', date: e.next_due_date })),
-                        ...insurance.map(i => ({ ...i, type: 'INSURANCE', date: i.next_due_date, amount: i.premium_amount })),
-                        ...reminders.filter(r => !r.is_paid).map(r => ({ ...r, type: 'REMINDER', name: r.title, date: r.next_due_date }))
+                        ...emis.filter(e => e.status === 'ACTIVE').map(e => ({ ...e, type: 'EMI', date: e.next_due_date }) as any),
+                        ...insurance.map(i => ({ ...i, type: 'INSURANCE', date: i.next_due_date, amount: i.premium_amount }) as any),
+                        ...reminders.filter(r => !r.is_paid).map(r => ({ ...r, type: 'REMINDER', name: r.title, date: r.next_due_date }) as any)
                       ];
 
                       const upcoming = allItems
@@ -601,9 +619,11 @@ export default function Dashboard() {
                               <div className="text-[10px] text-zinc-500">{item.type} • {new Date(item.date).toLocaleDateString()}</div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-white font-mono text-sm">{formatCurrency(item.amount)}</div>
-                            {new Date(item.date) < new Date() && <div className="text-[10px] text-red-400 font-bold">OVERDUE</div>}
+                          <div className="flex items-center gap-2">
+                            <div className="text-right mr-2">
+                              <div className="text-white font-mono text-sm">{formatCurrency(item.amount)}</div>
+                              {new Date(item.date) < new Date() && <div className="text-[10px] text-red-400 font-bold">OVERDUE</div>}
+                            </div>
                           </div>
                         </div>
                       ));
@@ -641,17 +661,17 @@ export default function Dashboard() {
                         </div>
                         <div className="text-right">
                           <div className="text-white font-mono">{formatCurrency(emi.amount)}</div>
-                          <div className="text-xs text-zinc-500 mb-2">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
+                          <div className="text-xs text-zinc-500">Due: {new Date(emi.next_due_date).toLocaleDateString()}</div>
                           <div className="flex gap-2 justify-end">
                             <button
-                              onClick={() => handleEmiAction(emi, 'skip')}
+                              onClick={() => handlePaymentAction(emi, 'EMI', 'skip')}
                               className="p-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 transition-colors"
                               title="Skip (Advance Date)"
                             >
                               <SkipForward className="w-3 h-3" />
                             </button>
                             <button
-                              onClick={() => handleEmiAction(emi, 'paid')}
+                              onClick={() => handlePaymentAction(emi, 'EMI', 'paid')}
                               className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20 transition-colors"
                               title="Mark Paid"
                             >
