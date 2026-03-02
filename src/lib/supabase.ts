@@ -2,6 +2,6 @@ import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export const createClient = () =>
     createSupabaseClient(
-        'https://lendflow.jiobase.com',
+        'https://cvqtqlbxxwzpwzmsmqmr.supabase.co',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
