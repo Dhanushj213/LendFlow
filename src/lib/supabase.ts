@@ -1,7 +1,7 @@
-import { createBrowserClient } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 
 export const createClient = () =>
-    createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    createSupabaseClient(
+        'https://lendflow.jiobase.com',
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
